@@ -16,7 +16,7 @@ pub trait UserRepository: Send + Sync {
     async fn find_all(&self, query: &PaginationQuery) -> Result<(Vec<User>, u64), AppError>;
     async fn find_by_id(&self, id: Uuid) -> Result<User, AppError>;
     async fn find_by_username(&self, username: &str) -> Result<User, AppError>;
-    async fn find_by_email(&self, email: &str) -> Result<User, AppError>;
+    // async fn find_by_email(&self, email: &str) -> Result<User, AppError>;
     async fn create(&self, user: &User) -> Result<User, AppError>;
     async fn update(&self, id: Uuid, user: &User) -> Result<User, AppError>;
     async fn delete(&self, id: Uuid) -> Result<(), AppError>;
@@ -58,9 +58,9 @@ impl<R: UserRepository> UserServiceImpl<R> {
         self.repository.find_by_username(username).await
     }
 
-    pub async fn get_by_email(&self, email: &str) -> Result<User, AppError> {
-        self.repository.find_by_email(email).await
-    }
+    // pub async fn get_by_email(&self, email: &str) -> Result<User, AppError> {
+    //     self.repository.find_by_email(email).await
+    // }
 
     pub async fn create(&self, req: CreateUserDto) -> Result<User, AppError> {
         let password_hash = crate::core::security::password::hash_password(&req.password)?;

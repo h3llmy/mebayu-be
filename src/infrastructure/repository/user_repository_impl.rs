@@ -1,6 +1,8 @@
-use crate::domain::users::entity::User;
-use crate::shared::dto::pagination::PaginationQuery;
-use crate::{core::error::AppError, domain::users::service::UserRepository};
+use crate::{
+    core::error::AppError,
+    domain::users::{entity::User, service::UserRepository},
+    shared::dto::pagination::PaginationQuery,
+};
 use async_trait::async_trait;
 use sqlx::{Pool, Postgres};
 use uuid::Uuid;
@@ -57,14 +59,14 @@ impl UserRepository for UserRepositoryImpl {
             .ok_or_else(|| AppError::NotFound("User not found".to_string()))
     }
 
-    async fn find_by_email(&self, email: &str) -> Result<User, AppError> {
-        sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = $1")
-            .bind(email)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| AppError::Database(e.to_string()))?
-            .ok_or_else(|| AppError::NotFound("User not found".to_string()))
-    }
+    // async fn find_by_email(&self, email: &str) -> Result<User, AppError> {
+    //     sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = $1")
+    //         .bind(email)
+    //         .fetch_optional(&self.pool)
+    //         .await
+    //         .map_err(|e| AppError::Database(e.to_string()))?
+    //         .ok_or_else(|| AppError::NotFound("User not found".to_string()))
+    // }
 
     async fn create(&self, user: &User) -> Result<User, AppError> {
         sqlx::query_as::<_, User>(

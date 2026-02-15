@@ -1,10 +1,13 @@
 use crate::{
-    core::error::AppError,
-    core::validation::ValidatedJson,
+    core::{error::AppError, middleware::auth::AuthUser, validation::ValidatedJson},
     domain::auth::dto::{AuthResponseDto, LoginDto, RefreshTokenDto, RegisterDto},
     shared::app_state::AppState,
 };
-use axum::{Json, Router, extract::State, routing::post};
+use axum::{
+    Json, Router,
+    extract::State,
+    routing::{get, post},
+};
 use std::sync::Arc;
 
 pub fn auth_routes() -> Router<Arc<AppState>> {
@@ -12,6 +15,15 @@ pub fn auth_routes() -> Router<Arc<AppState>> {
         .route("/login", post(login))
         .route("/register", post(register))
         .route("/refresh", post(refresh_token))
+        .route("/profile", get(get_profile))
+}
+
+async fn get_profile(
+    auth_user: AuthUser,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<crate::domain::users::dto::UserResponseDto>, AppError> {
+    let res = state.auth_service.get_profile(auth_user.user_id).await?;
+    Ok(Json(res))
 }
 
 async fn login(

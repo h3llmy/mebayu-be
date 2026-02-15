@@ -6,25 +6,23 @@ use crate::{
     domain::{
         auth::dto::{AuthResponseDto, LoginDto, RefreshTokenDto, RegisterDto},
         users::{
-            dto::UserResponseDto,
-            entity::{User, UserRole},
-            service::UserRepository,
+            dto::{CreateUserDto, UserResponseDto},
+            service::{UserRepository, UserServiceImpl},
         },
     },
 };
-use chrono::Utc;
 use std::sync::Arc;
 use uuid::Uuid;
 
 pub struct AuthService<R: UserRepository> {
-    repository: Arc<R>,
+    user_service: Arc<UserServiceImpl<R>>,
     jwt_secret: String,
 }
 
 impl<R: UserRepository> AuthService<R> {
-    pub fn new(repository: Arc<R>, jwt_secret: String) -> Self {
+    pub fn new(user_service: Arc<UserServiceImpl<R>>, jwt_secret: String) -> Self {
         Self {
-            repository,
+            user_service,
             jwt_secret,
         }
     }
@@ -34,8 +32,8 @@ impl<R: UserRepository> AuthService<R> {
         let password_str = req.password.unwrap();
 
         let user = self
-            .repository
-            .find_by_username(&username)
+            .user_service
+            .get_by_username(&username)
             .await
             .map_err(|_| AppError::Unauthorized("Invalid username or password".to_string()))?;
 
@@ -59,19 +57,13 @@ impl<R: UserRepository> AuthService<R> {
         let email = req.email.unwrap();
         let password_str = req.password.unwrap();
 
-        let password_hash = password::hash_password(&password_str).unwrap();
-
-        let user = User {
-            id: Uuid::new_v4(),
+        let create_user_dto = CreateUserDto {
             username,
             email,
-            password_hash,
-            role: UserRole::User,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            password: password_str,
         };
 
-        let created_user = self.repository.create(&user).await?;
+        let created_user = self.user_service.create(create_user_dto).await?;
         let tokens =
             jwt::generate_token_pair(created_user.id, created_user.role.clone(), &self.jwt_secret)?;
 
@@ -91,7 +83,7 @@ impl<R: UserRepository> AuthService<R> {
             return Err(AppError::Unauthorized("Invalid token type".to_string()));
         }
 
-        let user = self.repository.find_by_id(claims.sub).await?;
+        let user = self.user_service.get_by_id(claims.sub).await?;
         let tokens = jwt::generate_token_pair(user.id, user.role.clone(), &self.jwt_secret)?;
 
         Ok(AuthResponseDto {
@@ -99,5 +91,10 @@ impl<R: UserRepository> AuthService<R> {
             access_token: tokens.access_token,
             refresh_token: tokens.refresh_token,
         })
+    }
+
+    pub async fn get_profile(&self, user_id: Uuid) -> Result<UserResponseDto, AppError> {
+        let user = self.user_service.get_by_id(user_id).await?;
+        Ok(UserResponseDto::from(user))
     }
 }

@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use axum::{Router, middleware, routing::get};
 use sqlx::PgPool;
+use tower::ServiceBuilder;
+use tower_http::trace::TraceLayer;
 
 use crate::{
     core::{error::AppError, middleware::rate_limiter::rate_limiter_middleware},
@@ -33,15 +35,14 @@ pub async fn build_app(pool: PgPool, config: crate::core::config::Config) -> Rou
     let redis_client = create_redis_client(&config.redis_url);
 
     let product_repo = Arc::new(ProductRepositoryImpl::new(pool.clone()));
-    let product_service = Arc::new(ProductServiceImpl::new(product_repo));
-
     let category_repo = Arc::new(ProductCategoryRepositoryImpl::new(pool.clone()));
-    let product_category_service = Arc::new(ProductCategoryServiceImpl::new(category_repo));
-
     let user_repo = Arc::new(UserRepositoryImpl::new(pool));
+
+    let product_service = Arc::new(ProductServiceImpl::new(product_repo));
+    let product_category_service = Arc::new(ProductCategoryServiceImpl::new(category_repo));
     let user_service = Arc::new(UserServiceImpl::new(user_repo.clone()));
     let auth_service = Arc::new(AuthService::new(
-        user_repo.clone(),
+        user_service.clone(),
         config.jwt_secret.clone(),
     ));
 
@@ -68,5 +69,6 @@ pub async fn build_app(pool: PgPool, config: crate::core::config::Config) -> Rou
         .route("/health", get(health_check))
         .nest("/api/v1", api_v1_router)
         .fallback(not_found)
+        .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http()))
         .with_state(state)
 }

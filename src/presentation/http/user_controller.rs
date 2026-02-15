@@ -6,7 +6,10 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{
-    core::validation::{ValidatedJson, ValidatedQuery},
+    core::{
+        error::AppError,
+        validation::{ValidatedJson, ValidatedQuery},
+    },
     domain::users::dto::{CreateUserDto, UpdateUserDto, UserResponseDto},
     shared::{
         app_state::AppState,
@@ -27,7 +30,7 @@ async fn get_all(
     auth: AuthUser,
     State(state): State<Arc<AppState>>,
     ValidatedQuery(query): ValidatedQuery<PaginationQuery>,
-) -> Result<Json<PaginationResponse<Vec<UserResponseDto>>>, crate::core::error::AppError> {
+) -> Result<Json<PaginationResponse<Vec<UserResponseDto>>>, AppError> {
     auth.require_admin()?;
     let response = state.user_service.get_all(&query).await?;
     Ok(Json(response))
@@ -37,7 +40,7 @@ async fn get_by_id(
     _auth: AuthUser,
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
-) -> Result<Json<UserResponseDto>, crate::core::error::AppError> {
+) -> Result<Json<UserResponseDto>, AppError> {
     let user = state.user_service.get_by_id(id).await?;
     Ok(Json(UserResponseDto::from(user)))
 }
@@ -45,7 +48,7 @@ async fn get_by_id(
 async fn create(
     State(state): State<Arc<AppState>>,
     ValidatedJson(req): ValidatedJson<CreateUserDto>,
-) -> Result<Json<UserResponseDto>, crate::core::error::AppError> {
+) -> Result<Json<UserResponseDto>, AppError> {
     let user = state.user_service.create(req).await?;
     Ok(Json(UserResponseDto::from(user)))
 }
@@ -55,7 +58,7 @@ async fn update(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
     ValidatedJson(req): ValidatedJson<UpdateUserDto>,
-) -> Result<Json<UserResponseDto>, crate::core::error::AppError> {
+) -> Result<Json<UserResponseDto>, AppError> {
     let user = state.user_service.update(id, req).await?;
     Ok(Json(UserResponseDto::from(user)))
 }
@@ -64,7 +67,7 @@ async fn delete_user(
     _auth: AuthUser,
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
-) -> Result<Json<()>, crate::core::error::AppError> {
+) -> Result<Json<()>, AppError> {
     state.user_service.delete(id).await?;
     Ok(Json(()))
 }
