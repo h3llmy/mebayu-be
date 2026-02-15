@@ -42,12 +42,12 @@ where
             .map_err(|_| AppError::Unauthorized("Invalid authorization header".to_string()))?;
 
         // Verify the token
-        let claims = crate::shared::utils::jwt::verify_token(
+        let claims = crate::core::security::jwt::verify_token(
             bearer.0.token(),
             &app_state.config.jwt_secret,
         )?;
 
-        if claims.token_type != crate::shared::utils::jwt::TokenType::Access {
+        if claims.token_type != crate::core::security::jwt::TokenType::Access {
             return Err(AppError::Unauthorized("Invalid token type".to_string()));
         }
 

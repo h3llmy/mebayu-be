@@ -48,7 +48,7 @@ impl<R: UserRepository> UserServiceImpl<R> {
     }
 
     pub async fn create(&self, req: CreateUserDto) -> Result<User, AppError> {
-        let password_hash = crate::shared::utils::password::hash_password(&req.password)?;
+        let password_hash = crate::core::security::password::hash_password(&req.password)?;
 
         let user = User {
             id: Uuid::new_v4(),
@@ -67,7 +67,7 @@ impl<R: UserRepository> UserServiceImpl<R> {
         let user = self.repository.find_by_id(id).await?;
 
         let password_hash = match req.password {
-            Some(p) => crate::shared::utils::password::hash_password(&p)?,
+            Some(p) => crate::core::security::password::hash_password(&p)?,
             None => user.password_hash,
         };
 

@@ -1,5 +1,8 @@
 use crate::{
-    core::error::AppError,
+    core::{
+        error::AppError,
+        security::{jwt, password},
+    },
     domain::{
         auth::dto::{AuthResponseDto, LoginDto, RefreshTokenDto, RegisterDto},
         users::{
@@ -8,7 +11,6 @@ use crate::{
             service::UserRepository,
         },
     },
-    shared::utils::{jwt, password},
 };
 use chrono::Utc;
 use std::sync::Arc;
@@ -28,19 +30,8 @@ impl<R: UserRepository> AuthService<R> {
     }
 
     pub async fn login(&self, req: LoginDto) -> Result<AuthResponseDto, AppError> {
-        let username = req.username.ok_or_else(|| {
-            AppError::Validation(std::collections::HashMap::from([(
-                "username".to_string(),
-                vec!["Username is required".to_string()],
-            )]))
-        })?;
-
-        let password_str = req.password.ok_or_else(|| {
-            AppError::Validation(std::collections::HashMap::from([(
-                "password".to_string(),
-                vec!["Password is required".to_string()],
-            )]))
-        })?;
+        let username = req.username.unwrap();
+        let password_str = req.password.unwrap();
 
         let user = self
             .repository
@@ -64,41 +55,11 @@ impl<R: UserRepository> AuthService<R> {
     }
 
     pub async fn register(&self, req: RegisterDto) -> Result<AuthResponseDto, AppError> {
-        let username = req.username.ok_or_else(|| {
-            AppError::Validation(std::collections::HashMap::from([(
-                "username".to_string(),
-                vec!["Username is required".to_string()],
-            )]))
-        })?;
-        let email = req.email.ok_or_else(|| {
-            AppError::Validation(std::collections::HashMap::from([(
-                "email".to_string(),
-                vec!["Email is required".to_string()],
-            )]))
-        })?;
-        let password_str = req.password.ok_or_else(|| {
-            AppError::Validation(std::collections::HashMap::from([(
-                "password".to_string(),
-                vec!["Password is required".to_string()],
-            )]))
-        })?;
+        let username = req.username.unwrap();
+        let email = req.email.unwrap();
+        let password_str = req.password.unwrap();
 
-        // Check if user already exists
-        if self.repository.find_by_username(&username).await.is_ok() {
-            return Err(AppError::Validation(std::collections::HashMap::from([(
-                "username".to_string(),
-                vec!["Username already exists".to_string()],
-            )])));
-        }
-
-        if self.repository.find_by_email(&email).await.is_ok() {
-            return Err(AppError::Validation(std::collections::HashMap::from([(
-                "email".to_string(),
-                vec!["Email already exists".to_string()],
-            )])));
-        }
-
-        let password_hash = password::hash_password(&password_str)?;
+        let password_hash = password::hash_password(&password_str).unwrap();
 
         let user = User {
             id: Uuid::new_v4(),
@@ -122,12 +83,7 @@ impl<R: UserRepository> AuthService<R> {
     }
 
     pub async fn refresh_token(&self, req: RefreshTokenDto) -> Result<AuthResponseDto, AppError> {
-        let refresh_token = req.refresh_token.ok_or_else(|| {
-            AppError::Validation(std::collections::HashMap::from([(
-                "refresh_token".to_string(),
-                vec!["Refresh token is required".to_string()],
-            )]))
-        })?;
+        let refresh_token = req.refresh_token.unwrap();
 
         let claims = jwt::verify_token(&refresh_token, &self.jwt_secret)?;
 

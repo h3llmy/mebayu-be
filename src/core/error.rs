@@ -13,6 +13,7 @@ pub enum AppError {
     Database(String),
     Unauthorized(String),
     Forbidden(String),
+    Internal(String),
 }
 
 #[derive(Serialize)]
@@ -34,6 +35,7 @@ impl IntoResponse for AppError {
             AppError::Database(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg, None),
             AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg, None),
             AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg, None),
+            AppError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg, None),
         };
 
         (status, Json(ErrorResponse { message, errors })).into_response()
