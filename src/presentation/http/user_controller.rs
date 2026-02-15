@@ -29,19 +29,8 @@ async fn get_all(
     ValidatedQuery(query): ValidatedQuery<PaginationQuery>,
 ) -> Result<Json<PaginationResponse<Vec<UserResponseDto>>>, crate::core::error::AppError> {
     auth.require_admin()?;
-    let (users, total) = state.user_service.get_all(&query).await?;
-    let response = users.into_iter().map(UserResponseDto::from).collect();
-
-    let limit = query.get_limit();
-    let total_page = (total as f64 / limit as f64).ceil() as u64;
-
-    Ok(Json(PaginationResponse {
-        data: response,
-        total_data: total,
-        page: query.get_page(),
-        limit,
-        total_page,
-    }))
+    let response = state.user_service.get_all(&query).await?;
+    Ok(Json(response))
 }
 
 async fn get_by_id(

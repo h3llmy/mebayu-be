@@ -34,17 +34,8 @@ async fn get_all(
     State(state): State<Arc<AppState>>,
     ValidatedQuery(query): ValidatedQuery<PaginationQuery>,
 ) -> Result<Json<PaginationResponse<Vec<Product>>>, AppError> {
-    let (products, total_data) = state.product_service.get_all(&query).await?;
-    let limit = query.get_limit();
-    let total_page = (total_data as f64 / limit as f64).ceil() as u64;
-
-    Ok(Json(PaginationResponse {
-        data: products,
-        page: query.get_page(),
-        limit,
-        total_data,
-        total_page,
-    }))
+    let response = state.product_service.get_all(&query).await?;
+    Ok(Json(response))
 }
 
 async fn create(

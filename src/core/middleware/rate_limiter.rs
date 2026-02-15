@@ -5,9 +5,7 @@ use axum::{
     middleware::Next,
     response::Response,
 };
-use std::net::SocketAddr;
-
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
 pub async fn rate_limiter_middleware(
     State(state): State<Arc<AppState>>,

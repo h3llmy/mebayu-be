@@ -182,28 +182,51 @@ This allows:
 ---
 
 ## 🐳 Docker Setup (Optional)
+### Production Build
 
-Start PostgreSQL and Redis:
+Start PostgreSQL, Redis and Mebayu Backend:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 Stop services:
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 Rebuild containers:
 
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
+```
+
+### Development Build
+
+Start PostgreSQL, Redis and Mebayu Backend:
+
+this will start the app with hot reload
+
+```bash
+docker compose -f docker-compose.yml up -d
+```
+
+Stop services:
+
+```bash
+docker compose -f docker-compose.yml down
+```
+
+Rebuild containers:
+
+```bash
+docker compose -f docker-compose.yml up -d --build
 ```
 
 ---
 
-## 🛠 Running the Project
+## 🛠 Running the Project (Local)
 
 ### Development (Hot Reload)
 

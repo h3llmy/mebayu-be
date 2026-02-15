@@ -4,9 +4,9 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
-    core::error::AppError,
-    domain::users::dto::{CreateUserDto, UpdateUserDto},
-    shared::dto::pagination::PaginationQuery,
+    core::{error::AppError, security::password},
+    domain::users::dto::{CreateUserDto, UpdateUserDto, UserResponseDto},
+    shared::dto::{pagination::PaginationQuery, response::PaginationResponse},
 };
 
 use super::entity::{User, UserRole};
@@ -31,8 +31,23 @@ impl<R: UserRepository> UserServiceImpl<R> {
         Self { repository }
     }
 
-    pub async fn get_all(&self, query: &PaginationQuery) -> Result<(Vec<User>, u64), AppError> {
-        self.repository.find_all(query).await
+    pub async fn get_all(
+        &self,
+        query: &PaginationQuery,
+    ) -> Result<PaginationResponse<Vec<UserResponseDto>>, AppError> {
+        let (users, total_data) = self.repository.find_all(query).await?;
+        let limit = query.get_limit();
+        let total_page = (total_data as f64 / limit as f64).ceil() as u64;
+
+        let data = users.into_iter().map(UserResponseDto::from).collect();
+
+        Ok(PaginationResponse {
+            data,
+            page: query.get_page(),
+            limit,
+            total_data,
+            total_page,
+        })
     }
 
     pub async fn get_by_id(&self, id: Uuid) -> Result<User, AppError> {
@@ -67,7 +82,7 @@ impl<R: UserRepository> UserServiceImpl<R> {
         let user = self.repository.find_by_id(id).await?;
 
         let password_hash = match req.password {
-            Some(p) => crate::core::security::password::hash_password(&p)?,
+            Some(p) => password::hash_password(&p)?,
             None => user.password_hash,
         };
 

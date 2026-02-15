@@ -28,23 +28,15 @@ pub fn category_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(get_all).post(create))
         .route("/{id}", get(get_by_id).put(update).delete(delete))
+        .route("/with-product-count", get(get_all_with_product_count))
 }
 
 async fn get_all(
     State(state): State<Arc<AppState>>,
     ValidatedQuery(query): ValidatedQuery<PaginationQuery>,
 ) -> Result<Json<PaginationResponse<Vec<ProductCategory>>>, AppError> {
-    let (categories, total_data) = state.product_category_service.get_all(&query).await?;
-    let limit = query.get_limit();
-    let total_page = (total_data as f64 / limit as f64).ceil() as u64;
-
-    Ok(Json(PaginationResponse {
-        data: categories,
-        page: query.get_page(),
-        limit,
-        total_data,
-        total_page,
-    }))
+    let response = state.product_category_service.get_all(&query).await?;
+    Ok(Json(response))
 }
 
 async fn create(
@@ -61,6 +53,17 @@ async fn get_by_id(
 ) -> Result<Json<ApiResponse<ProductCategory>>, AppError> {
     let category = state.product_category_service.get_by_id(*id).await?;
     Ok(Json(ApiResponse { data: category }))
+}
+
+async fn get_all_with_product_count(
+    State(state): State<Arc<AppState>>,
+    ValidatedQuery(query): ValidatedQuery<PaginationQuery>,
+) -> Result<Json<PaginationResponse<Vec<ProductCategory>>>, AppError> {
+    let response = state
+        .product_category_service
+        .get_all_with_product_count(&query)
+        .await?;
+    Ok(Json(response))
 }
 
 async fn update(

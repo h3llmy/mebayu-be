@@ -50,7 +50,6 @@ pub async fn build_app(pool: PgPool, config: crate::core::config::Config) -> Rou
         product_category_service,
         user_service,
         auth_service,
-        user_repository: user_repo.clone(),
         redis_client,
         config: config.clone(),
     });

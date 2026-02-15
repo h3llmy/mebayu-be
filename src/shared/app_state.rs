@@ -18,7 +18,6 @@ pub struct AppState {
     pub product_category_service: Arc<ProductCategoryServiceImpl<ProductCategoryRepositoryImpl>>,
     pub user_service: Arc<UserServiceImpl<UserRepositoryImpl>>,
     pub auth_service: Arc<AuthService<UserRepositoryImpl>>,
-    pub user_repository: Arc<UserRepositoryImpl>,
     pub redis_client: redis::Client,
     pub config: Config,
 }

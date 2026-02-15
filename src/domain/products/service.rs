@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::{
     core::error::AppError,
     domain::products::dto::{CreateProductRequest, UpdateProductRequest},
-    shared::dto::pagination::PaginationQuery,
+    shared::dto::{pagination::PaginationQuery, response::PaginationResponse},
 };
 
 use super::entity::Product;
@@ -28,8 +28,21 @@ impl<R: ProductRepository> ProductServiceImpl<R> {
         Self { repository }
     }
 
-    pub async fn get_all(&self, query: &PaginationQuery) -> Result<(Vec<Product>, u64), AppError> {
-        self.repository.find_all(query).await
+    pub async fn get_all(
+        &self,
+        query: &PaginationQuery,
+    ) -> Result<PaginationResponse<Vec<Product>>, AppError> {
+        let (products, total_data) = self.repository.find_all(query).await?;
+        let limit = query.get_limit();
+        let total_page = (total_data as f64 / limit as f64).ceil() as u64;
+
+        Ok(PaginationResponse {
+            data: products,
+            page: query.get_page(),
+            limit,
+            total_data,
+            total_page,
+        })
     }
 
     pub async fn get_by_id(&self, id: Uuid) -> Result<Product, AppError> {

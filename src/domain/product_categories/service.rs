@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::{
     core::error::AppError,
     domain::product_categories::dto::{CreateProductCategoryRequest, UpdateProductCategoryRequest},
-    shared::dto::pagination::PaginationQuery,
+    shared::dto::{pagination::PaginationQuery, response::PaginationResponse},
 };
 
 use super::entity::ProductCategory;
@@ -13,6 +13,10 @@ use super::entity::ProductCategory;
 #[async_trait]
 pub trait ProductCategoryRepository: Send + Sync {
     async fn find_all(
+        &self,
+        query: &PaginationQuery,
+    ) -> Result<(Vec<ProductCategory>, u64), AppError>;
+    async fn find_all_with_product_count(
         &self,
         query: &PaginationQuery,
     ) -> Result<(Vec<ProductCategory>, u64), AppError>;
@@ -38,8 +42,35 @@ impl<R: ProductCategoryRepository> ProductCategoryServiceImpl<R> {
     pub async fn get_all(
         &self,
         query: &PaginationQuery,
-    ) -> Result<(Vec<ProductCategory>, u64), AppError> {
-        self.repository.find_all(query).await
+    ) -> Result<PaginationResponse<Vec<ProductCategory>>, AppError> {
+        let (categories, total_data) = self.repository.find_all(query).await?;
+        let limit = query.get_limit();
+        let total_page = (total_data as f64 / limit as f64).ceil() as u64;
+
+        Ok(PaginationResponse {
+            data: categories,
+            page: query.get_page(),
+            limit,
+            total_data,
+            total_page,
+        })
+    }
+
+    pub async fn get_all_with_product_count(
+        &self,
+        query: &PaginationQuery,
+    ) -> Result<PaginationResponse<Vec<ProductCategory>>, AppError> {
+        let (categories, total_data) = self.repository.find_all_with_product_count(query).await?;
+        let limit = query.get_limit();
+        let total_page = (total_data as f64 / limit as f64).ceil() as u64;
+
+        Ok(PaginationResponse {
+            data: categories,
+            page: query.get_page(),
+            limit,
+            total_data,
+            total_page,
+        })
     }
 
     pub async fn get_by_id(&self, id: Uuid) -> Result<ProductCategory, AppError> {
