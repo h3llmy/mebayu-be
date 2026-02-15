@@ -6,6 +6,8 @@ volumes:
   redis_data:
   cargo_registry:
   target_cache:
+  prometheus_data:
+  grafana_data:
 
 services:
   backend:
@@ -64,3 +66,54 @@ services:
       retries: 5
     networks:
       - mebayu_network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mebayu_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - mebayu_network
+
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: mebayu_loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - mebayu_network
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: mebayu_promtail
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./monitoring/promtail/promtail.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - mebayu_network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mebayu_grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - mebayu_network
+

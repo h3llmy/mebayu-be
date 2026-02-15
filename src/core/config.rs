@@ -1,4 +1,5 @@
 use std::env;
+use tracing_subscriber::{filter::EnvFilter, prelude::*};
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -31,5 +32,14 @@ impl Config {
                 .unwrap_or(60),
             jwt_secret: env::var("JWT_SECRET").unwrap_or_else(|_| "default_secret".to_string()),
         }
+    }
+
+    pub fn logger_setup() {
+        let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(tracing_subscriber::fmt::layer().compact().with_target(true))
+            .init();
     }
 }

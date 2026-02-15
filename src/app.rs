@@ -6,7 +6,7 @@ use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 
 use crate::{
-    core::{error::AppError, middleware::rate_limiter::rate_limiter_middleware},
+    core::{config::Config, error::AppError, middleware::rate_limiter::rate_limiter_middleware},
     domain::{
         auth::service::AuthService, product_categories::service::ProductCategoryServiceImpl,
         products::service::ProductServiceImpl, users::service::UserServiceImpl,
@@ -31,7 +31,7 @@ async fn health_check() -> Result<String, AppError> {
     Ok("OK".to_string())
 }
 
-pub async fn build_app(pool: PgPool, config: crate::core::config::Config) -> Router {
+pub async fn build_app(pool: PgPool, config: Config) -> Router {
     let redis_client = create_redis_client(&config.redis_url);
 
     let product_repo = Arc::new(ProductRepositoryImpl::new(pool.clone()));
@@ -65,10 +65,24 @@ pub async fn build_app(pool: PgPool, config: crate::core::config::Config) -> Rou
             rate_limiter_middleware,
         ));
 
+    let recorder_handle = metrics_exporter_prometheus::PrometheusBuilder::new()
+        .install_recorder()
+        .expect("failed to install Prometheus recorder");
+
     Router::new()
         .route("/health", get(health_check))
+        .route(
+            "/metrics",
+            get(move || std::future::ready(recorder_handle.render())),
+        )
         .nest("/api/v1", api_v1_router)
         .fallback(not_found)
-        .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http()))
+        .layer(
+            ServiceBuilder::new()
+                .layer(TraceLayer::new_for_http())
+                .layer(middleware::from_fn(
+                    crate::core::middleware::metrics::track_metrics,
+                )),
+        )
         .with_state(state)
 }

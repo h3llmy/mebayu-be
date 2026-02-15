@@ -7,3 +7,4 @@ README.md
 .idea
 .cursor
 docker-compose.yml
+monitoring/

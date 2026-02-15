@@ -14,6 +14,7 @@ async fn main() {
     dotenvy::dotenv().ok();
 
     let config = Config::from_env();
+    Config::logger_setup();
 
     let pool = create_pool(&config.database_url).await;
     run_migrations(&pool).await;
@@ -23,7 +24,7 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
 
-    println!(
+    tracing::info!(
         "Server running on http://{}",
         listener.local_addr().unwrap()
     );
