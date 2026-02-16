@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM product_category_relations WHERE product_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "46905d357387ea33f15b47694f40d1b00f8cd6c8d698b46c562d6ad00e0bad41"
+}

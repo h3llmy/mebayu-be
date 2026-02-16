@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use sqlx::{PgPool, Postgres, QueryBuilder, Row};
 use uuid::Uuid;
@@ -32,16 +34,8 @@ impl ProductRepository for ProductRepositoryImpl {
             r#"
         SELECT 
             p.*,
-            c.name as category_name,
-            c.created_at as category_created_at,
-            c.updated_at as category_updated_at,
-            m.name as material_name,
-            m.created_at as material_created_at,
-            m.updated_at as material_updated_at,
             COUNT(*) OVER() as total_count
         FROM products p
-        JOIN product_categories c ON p.category_id = c.id
-        LEFT JOIN product_materials m ON p.material_id = m.id
         "#,
         );
 
@@ -93,42 +87,70 @@ impl ProductRepository for ProductRepositoryImpl {
             .await
             .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
-        let total = rows
-            .first()
-            .and_then(|r| r.try_get::<i64, _>("total_count").ok())
-            .unwrap_or(0);
+        if rows.is_empty() {
+            return Ok((vec![], 0));
+        }
+
+        let total = rows[0].get::<i64, _>("total_count") as u64;
+        let product_ids: Vec<Uuid> = rows.iter().map(|r| r.get("id")).collect();
+
+        // Fetch categories for all products
+        let categories_rows = sqlx::query!(
+            r#"
+            SELECT pcr.product_id, pc.* 
+            FROM product_category_relations pcr
+            JOIN product_categories pc ON pcr.category_id = pc.id
+            WHERE pcr.product_id = ANY($1)
+            "#,
+            &product_ids
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+        // Fetch materials for all products
+        let materials_rows = sqlx::query!(
+            r#"
+            SELECT pmr.product_id, pm.*
+            FROM product_material_relations pmr
+            JOIN product_materials pm ON pmr.material_id = pm.id
+            WHERE pmr.product_id = ANY($1)
+            "#,
+            &product_ids
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
         let products = rows
             .into_iter()
             .map(|r| {
-                let material_id: Option<Uuid> = r.get("material_id");
-                let material_name: Option<String> = r.get("material_name");
-                let material_created_at: Option<chrono::DateTime<chrono::Utc>> =
-                    r.get("material_created_at");
-                let material_updated_at: Option<chrono::DateTime<chrono::Utc>> =
-                    r.get("material_updated_at");
+                let id: Uuid = r.get("id");
 
-                let product_material =
-                    if let (Some(id), Some(name), Some(created_at), Some(updated_at)) = (
-                        material_id,
-                        material_name,
-                        material_created_at,
-                        material_updated_at,
-                    ) {
-                        Some(ProductMaterial {
-                            id,
-                            name,
-                            created_at,
-                            updated_at,
-                        })
-                    } else {
-                        None
-                    };
+                let categories: Vec<ProductCategory> = categories_rows
+                    .iter()
+                    .filter(|cr| cr.product_id == id)
+                    .map(|cr| ProductCategory {
+                        id: cr.id,
+                        name: cr.name.clone(),
+                        created_at: cr.created_at,
+                        updated_at: cr.updated_at,
+                    })
+                    .collect();
+
+                let product_materials: Vec<ProductMaterial> = materials_rows
+                    .iter()
+                    .filter(|mr| mr.product_id == id)
+                    .map(|mr| ProductMaterial {
+                        id: mr.id,
+                        name: mr.name.clone(),
+                        created_at: mr.created_at,
+                        updated_at: mr.updated_at,
+                    })
+                    .collect();
 
                 Product {
-                    id: r.get("id"),
-                    category_id: r.get("category_id"),
-                    material_id,
+                    id,
                     name: r.get("name"),
                     material: r.get("material"),
                     price: r.get("price"),
@@ -136,97 +158,104 @@ impl ProductRepository for ProductRepositoryImpl {
                     status: r.get("status"),
                     created_at: r.get("created_at"),
                     updated_at: r.get("updated_at"),
-                    category: Some(ProductCategory {
-                        id: r.get("category_id"),
-                        name: r.get("category_name"),
-                        created_at: r.get("category_created_at"),
-                        updated_at: r.get("category_updated_at"),
-                    }),
-                    product_material,
+                    category_ids: categories.iter().map(|c| c.id).collect(),
+                    material_ids: product_materials.iter().map(|m| m.id).collect(),
+                    categories,
+                    product_materials,
                 }
             })
             .collect();
-        Ok((products, total as u64))
+
+        Ok((products, total))
     }
 
     async fn find_by_id(&self, id: Uuid) -> Result<Product, AppError> {
-        let row = sqlx::query!(
+        let product_row = sqlx::query!("SELECT * FROM products WHERE id = $1", id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| AppError::Database(e.to_string()))?
+            .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
+
+        let categories = sqlx::query_as!(
+            ProductCategory,
             r#"
-            SELECT 
-                p.*,
-                c.name as category_name,
-                c.created_at as category_created_at,
-                c.updated_at as category_updated_at,
-                m.name as "material_name?",
-                m.created_at as "material_created_at?",
-                m.updated_at as "material_updated_at?"
-            FROM products p
-            JOIN product_categories c ON p.category_id = c.id
-            LEFT JOIN product_materials m ON p.material_id = m.id
-            WHERE p.id = $1
+            SELECT pc.* 
+            FROM product_category_relations pcr
+            JOIN product_categories pc ON pcr.category_id = pc.id
+            WHERE pcr.product_id = $1
             "#,
             id
         )
-        .fetch_one(&self.pool)
+        .fetch_all(&self.pool)
         .await
-        .map_err(|_| AppError::NotFound("Product not found".to_string()))?;
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
-        let product_material = if let (Some(id), Some(name), Some(created_at), Some(updated_at)) = (
-            row.material_id,
-            row.material_name,
-            row.material_created_at,
-            row.material_updated_at,
-        ) {
-            Some(ProductMaterial {
-                id,
-                name,
-                created_at,
-                updated_at,
-            })
-        } else {
-            None
-        };
+        let product_materials = sqlx::query_as!(
+            ProductMaterial,
+            r#"
+            SELECT pm.*
+            FROM product_material_relations pmr
+            JOIN product_materials pm ON pmr.material_id = pm.id
+            WHERE pmr.product_id = $1
+            "#,
+            id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
         Ok(Product {
-            id: row.id,
-            category_id: row.category_id,
-            material_id: row.material_id,
-            name: row.name,
-            material: row.material,
-            price: row.price,
-            description: row.description,
-            status: row.status,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-            category: Some(ProductCategory {
-                id: row.category_id,
-                name: row.category_name,
-                created_at: row.category_created_at,
-                updated_at: row.category_updated_at,
-            }),
-            product_material,
+            id: product_row.id,
+            name: product_row.name,
+            material: product_row.material,
+            price: product_row.price,
+            description: product_row.description,
+            status: product_row.status,
+            created_at: product_row.created_at,
+            updated_at: product_row.updated_at,
+            category_ids: categories.iter().map(|c| c.id).collect(),
+            material_ids: product_materials.iter().map(|m| m.id).collect(),
+            categories,
+            product_materials,
         })
     }
 
     async fn create(&self, product: &Product) -> Result<Product, AppError> {
-        let category_exist = sqlx::query!(
-            "SELECT id FROM product_categories WHERE id = $1",
-            product.category_id
-        )
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| AppError::Database(e.to_string()))?;
 
-        if category_exist.is_none() {
-            return Err(AppError::NotFound("Category not found".to_string()));
+        // 1. Check if all categories exist
+        if !product.category_ids.is_empty() {
+            let count = sqlx::query!(
+                "SELECT count(*) FROM product_categories WHERE id = ANY($1)",
+                &product.category_ids
+            )
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(|e| AppError::Database(e.to_string()))?
+            .count
+            .unwrap_or(0);
+
+            if count != product.category_ids.len() as i64 {
+                return Err(AppError::NotFound(
+                    "One or more categories not found".to_string(),
+                ));
+            }
+        } else {
+            return Err(AppError::Validation(HashMap::from([(
+                "category_ids".to_string(),
+                vec!["At least one category is required".to_string()],
+            )])));
         }
 
-        let row = sqlx::query!(
-            "INSERT INTO products (id, category_id, material_id, name, material, price, description, status, created_at, updated_at)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id",
+        // 2. Insert product
+        sqlx::query!(
+            "INSERT INTO products (id, name, material, price, description, status, created_at, updated_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
             product.id,
-            product.category_id,
-            product.material_id,
             product.name,
             product.material,
             product.price,
@@ -235,19 +264,52 @@ impl ProductRepository for ProductRepositoryImpl {
             product.created_at,
             product.updated_at
         )
-        .fetch_one(&self.pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
-        self.find_by_id(row.id).await
+        // 3. Insert category relations
+        for category_id in &product.category_ids {
+            sqlx::query!(
+                "INSERT INTO product_category_relations (product_id, category_id) VALUES ($1, $2)",
+                product.id,
+                category_id
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
+        // 4. Insert material relations
+        for material_id in &product.material_ids {
+            sqlx::query!(
+                "INSERT INTO product_material_relations (product_id, material_id) VALUES ($1, $2)",
+                product.id,
+                material_id
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
+        tx.commit()
+            .await
+            .map_err(|e| AppError::Database(e.to_string()))?;
+
+        self.find_by_id(product.id).await
     }
 
     async fn update(&self, id: Uuid, product: &Product) -> Result<Product, AppError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| AppError::Database(e.to_string()))?;
+
+        // 1. Update product basic fields
         sqlx::query!(
-            "UPDATE products SET category_id = $2, material_id = $3, name = $4, material = $5, price = $6, description = $7, status = $8, updated_at = $9 WHERE id = $1",
+            "UPDATE products SET name = $2, material = $3, price = $4, description = $5, status = $6, updated_at = $7 WHERE id = $1",
             id,
-            product.category_id,
-            product.material_id,
             product.name,
             product.material,
             product.price,
@@ -255,9 +317,57 @@ impl ProductRepository for ProductRepositoryImpl {
             product.status,
             product.updated_at
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+
+        // 2. Update category relations
+        // Clear existing
+        sqlx::query!(
+            "DELETE FROM product_category_relations WHERE product_id = $1",
+            id
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+        // Add new
+        for category_id in &product.category_ids {
+            sqlx::query!(
+                "INSERT INTO product_category_relations (product_id, category_id) VALUES ($1, $2)",
+                id,
+                category_id
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
+        // 3. Update material relations
+        // Clear existing
+        sqlx::query!(
+            "DELETE FROM product_material_relations WHERE product_id = $1",
+            id
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+        // Add new
+        for material_id in &product.material_ids {
+            sqlx::query!(
+                "INSERT INTO product_material_relations (product_id, material_id) VALUES ($1, $2)",
+                id,
+                material_id
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
+        tx.commit()
+            .await
+            .map_err(|e| AppError::Database(e.to_string()))?;
 
         self.find_by_id(id).await
     }
