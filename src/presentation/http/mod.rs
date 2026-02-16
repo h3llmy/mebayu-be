@@ -7,3 +7,5 @@ pub use auth_controller::*;
 pub use product_category_controller::*;
 pub use product_controller::*;
 pub use user_controller::*;
+pub mod product_material_controller;
+pub use product_material_controller::*;

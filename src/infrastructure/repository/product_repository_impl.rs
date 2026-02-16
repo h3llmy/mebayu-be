@@ -6,6 +6,7 @@ use crate::{
     core::error::AppError,
     domain::{
         product_categories::entity::ProductCategory,
+        product_materials::entity::ProductMaterial,
         products::{entity::Product, service::ProductRepository},
     },
     shared::dto::pagination::{PaginationQuery, SortOrder},
@@ -34,9 +35,13 @@ impl ProductRepository for ProductRepositoryImpl {
             c.name as category_name,
             c.created_at as category_created_at,
             c.updated_at as category_updated_at,
+            m.name as material_name,
+            m.created_at as material_created_at,
+            m.updated_at as material_updated_at,
             COUNT(*) OVER() as total_count
         FROM products p
         JOIN product_categories c ON p.category_id = c.id
+        LEFT JOIN product_materials m ON p.material_id = m.id
         "#,
         );
 
@@ -86,7 +91,7 @@ impl ProductRepository for ProductRepositoryImpl {
             .build()
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         let total = rows
             .first()
@@ -95,25 +100,52 @@ impl ProductRepository for ProductRepositoryImpl {
 
         let products = rows
             .into_iter()
-            .map(|r| Product {
-                id: r.get("id"),
-                category_id: r.get("category_id"),
-                name: r.get("name"),
-                material: r.get("material"),
-                price: r.get("price"),
-                description: r.get("description"),
-                status: r.get("status"),
-                created_at: r.get("created_at"),
-                updated_at: r.get("updated_at"),
-                category: Some(ProductCategory {
-                    id: r.get("category_id"),
-                    name: r.get("category_name"),
-                    created_at: r.get("category_created_at"),
-                    updated_at: r.get("category_updated_at"),
-                }),
+            .map(|r| {
+                let material_id: Option<Uuid> = r.get("material_id");
+                let material_name: Option<String> = r.get("material_name");
+                let material_created_at: Option<chrono::DateTime<chrono::Utc>> =
+                    r.get("material_created_at");
+                let material_updated_at: Option<chrono::DateTime<chrono::Utc>> =
+                    r.get("material_updated_at");
+
+                let product_material =
+                    if let (Some(id), Some(name), Some(created_at), Some(updated_at)) = (
+                        material_id,
+                        material_name,
+                        material_created_at,
+                        material_updated_at,
+                    ) {
+                        Some(ProductMaterial {
+                            id,
+                            name,
+                            created_at,
+                            updated_at,
+                        })
+                    } else {
+                        None
+                    };
+
+                Product {
+                    id: r.get("id"),
+                    category_id: r.get("category_id"),
+                    material_id,
+                    name: r.get("name"),
+                    material: r.get("material"),
+                    price: r.get("price"),
+                    description: r.get("description"),
+                    status: r.get("status"),
+                    created_at: r.get("created_at"),
+                    updated_at: r.get("updated_at"),
+                    category: Some(ProductCategory {
+                        id: r.get("category_id"),
+                        name: r.get("category_name"),
+                        created_at: r.get("category_created_at"),
+                        updated_at: r.get("category_updated_at"),
+                    }),
+                    product_material,
+                }
             })
             .collect();
-
         Ok((products, total as u64))
     }
 
@@ -124,9 +156,13 @@ impl ProductRepository for ProductRepositoryImpl {
                 p.*,
                 c.name as category_name,
                 c.created_at as category_created_at,
-                c.updated_at as category_updated_at
+                c.updated_at as category_updated_at,
+                m.name as "material_name?",
+                m.created_at as "material_created_at?",
+                m.updated_at as "material_updated_at?"
             FROM products p
             JOIN product_categories c ON p.category_id = c.id
+            LEFT JOIN product_materials m ON p.material_id = m.id
             WHERE p.id = $1
             "#,
             id
@@ -135,9 +171,26 @@ impl ProductRepository for ProductRepositoryImpl {
         .await
         .map_err(|_| AppError::NotFound("Product not found".to_string()))?;
 
+        let product_material = if let (Some(id), Some(name), Some(created_at), Some(updated_at)) = (
+            row.material_id,
+            row.material_name,
+            row.material_created_at,
+            row.material_updated_at,
+        ) {
+            Some(ProductMaterial {
+                id,
+                name,
+                created_at,
+                updated_at,
+            })
+        } else {
+            None
+        };
+
         Ok(Product {
             id: row.id,
             category_id: row.category_id,
+            material_id: row.material_id,
             name: row.name,
             material: row.material,
             price: row.price,
@@ -151,6 +204,7 @@ impl ProductRepository for ProductRepositoryImpl {
                 created_at: row.category_created_at,
                 updated_at: row.category_updated_at,
             }),
+            product_material,
         })
     }
 
@@ -161,17 +215,18 @@ impl ProductRepository for ProductRepositoryImpl {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| AppError::Database(e.to_string()))?;
+        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         if category_exist.is_none() {
             return Err(AppError::NotFound("Category not found".to_string()));
         }
 
         let row = sqlx::query!(
-            "INSERT INTO products (id, category_id, name, material, price, description, status, created_at, updated_at)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id",
+            "INSERT INTO products (id, category_id, material_id, name, material, price, description, status, created_at, updated_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id",
             product.id,
             product.category_id,
+            product.material_id,
             product.name,
             product.material,
             product.price,
@@ -182,16 +237,17 @@ impl ProductRepository for ProductRepositoryImpl {
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| AppError::Database(e.to_string()))?;
+        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         self.find_by_id(row.id).await
     }
 
     async fn update(&self, id: Uuid, product: &Product) -> Result<Product, AppError> {
         sqlx::query!(
-            "UPDATE products SET category_id = $2, name = $3, material = $4, price = $5, description = $6, status = $7, updated_at = $8 WHERE id = $1",
+            "UPDATE products SET category_id = $2, material_id = $3, name = $4, material = $5, price = $6, description = $7, status = $8, updated_at = $9 WHERE id = $1",
             id,
             product.category_id,
+            product.material_id,
             product.name,
             product.material,
             product.price,
@@ -201,7 +257,7 @@ impl ProductRepository for ProductRepositoryImpl {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| AppError::Database(e.to_string()))?;
+        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         self.find_by_id(id).await
     }
@@ -210,7 +266,7 @@ impl ProductRepository for ProductRepositoryImpl {
         sqlx::query!("DELETE FROM products WHERE id = $1", id)
             .execute(&self.pool)
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         Ok(())
     }

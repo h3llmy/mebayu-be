@@ -6,6 +6,8 @@ use validator::Validate;
 pub struct UpdateProductRequest {
     pub category_id: Option<Uuid>,
 
+    pub material_id: Option<Uuid>,
+
     #[validate(length(min = 1, message = "Name is required"))]
     pub name: Option<String>,
 

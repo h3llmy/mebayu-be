@@ -16,7 +16,7 @@ ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin mebayu_be
 
 # Runtime stage
-FROM debian:bookworm-slim AS runtime
+FROM debian:trixie-slim AS runtime
 WORKDIR /app
 
 # Install required packages (openssl, certs, curl for healthcheck)

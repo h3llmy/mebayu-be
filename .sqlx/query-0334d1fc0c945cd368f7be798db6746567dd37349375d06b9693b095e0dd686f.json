@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO products (id, category_id, name, material, price, description, status, created_at, updated_at)\n             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id",
+  "query": "INSERT INTO products (id, category_id, material_id, name, material, price, description, status, created_at, updated_at)\n             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id",
   "describe": {
     "columns": [
       {
@@ -11,6 +11,7 @@
     ],
     "parameters": {
       "Left": [
+        "Uuid",
         "Uuid",
         "Uuid",
         "Varchar",
@@ -26,5 +27,5 @@
       false
     ]
   },
-  "hash": "bac392d48beb001d4d9fb5a64a9b45e62c9ba5d8607cf23e2dc911d8b8621121"
+  "hash": "0334d1fc0c945cd368f7be798db6746567dd37349375d06b9693b095e0dd686f"
 }

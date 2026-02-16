@@ -9,12 +9,14 @@ use crate::{
     core::{config::Config, error::AppError, middleware::rate_limiter::rate_limiter_middleware},
     domain::{
         auth::service::AuthService, product_categories::service::ProductCategoryServiceImpl,
+        product_materials::service::ProductMaterialServiceImpl,
         products::service::ProductServiceImpl, users::service::UserServiceImpl,
     },
     infrastructure::{
         database::redis::create_redis_client,
         repository::{
             product_category_repository_impl::ProductCategoryRepositoryImpl,
+            product_material_repository_impl::ProductMaterialRepositoryImpl,
             product_repository_impl::ProductRepositoryImpl,
             user_repository_impl::UserRepositoryImpl,
         },
@@ -36,10 +38,12 @@ pub async fn build_app(pool: PgPool, config: Config) -> Router {
 
     let product_repo = Arc::new(ProductRepositoryImpl::new(pool.clone()));
     let category_repo = Arc::new(ProductCategoryRepositoryImpl::new(pool.clone()));
+    let material_repo = Arc::new(ProductMaterialRepositoryImpl::new(pool.clone()));
     let user_repo = Arc::new(UserRepositoryImpl::new(pool));
 
     let product_service = Arc::new(ProductServiceImpl::new(product_repo));
     let product_category_service = Arc::new(ProductCategoryServiceImpl::new(category_repo));
+    let product_material_service = Arc::new(ProductMaterialServiceImpl::new(material_repo));
     let user_service = Arc::new(UserServiceImpl::new(user_repo.clone()));
     let auth_service = Arc::new(AuthService::new(
         user_service.clone(),
@@ -49,6 +53,7 @@ pub async fn build_app(pool: PgPool, config: Config) -> Router {
     let state = Arc::new(AppState {
         product_service,
         product_category_service,
+        product_material_service,
         user_service,
         auth_service,
         redis_client,
@@ -59,6 +64,7 @@ pub async fn build_app(pool: PgPool, config: Config) -> Router {
         .nest("/auth", auth_routes())
         .nest("/products", product_routes())
         .nest("/product-categories", category_routes())
+        .nest("/product-materials", product_material_routes())
         .nest("/users", routes())
         .layer(middleware::from_fn_with_state(
             state.clone(),

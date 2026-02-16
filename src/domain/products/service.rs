@@ -53,6 +53,7 @@ impl<R: ProductRepository> ProductServiceImpl<R> {
         let product = Product {
             id: Uuid::new_v4(),
             category_id: req.category_id.unwrap(),
+            material_id: req.material_id,
             name: req.name.unwrap(),
             material: req.material.unwrap(),
             price: req.price.unwrap(),
@@ -61,6 +62,7 @@ impl<R: ProductRepository> ProductServiceImpl<R> {
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
             category: None,
+            product_material: None,
         };
 
         self.repository.create(&product).await
@@ -71,8 +73,8 @@ impl<R: ProductRepository> ProductServiceImpl<R> {
         let product = Product {
             id,
             category_id: req.category_id.unwrap_or(product.category_id),
+            material_id: req.material_id.or(product.material_id),
             name: req.name.unwrap_or(product.name),
-
             material: req.material.unwrap_or(product.material),
             price: req.price.unwrap_or(product.price),
             description: req.description.unwrap_or(product.description),
@@ -80,6 +82,7 @@ impl<R: ProductRepository> ProductServiceImpl<R> {
             created_at: product.created_at,
             updated_at: chrono::Utc::now(),
             category: None,
+            product_material: None,
         };
 
         self.repository.update(id, &product).await

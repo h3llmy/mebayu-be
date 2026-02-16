@@ -7,6 +7,8 @@ pub struct CreateProductRequest {
     #[validate(required(message = "Category ID is required"))]
     pub category_id: Option<Uuid>,
 
+    pub material_id: Option<Uuid>,
+
     #[validate(required(message = "Name is required"))]
     #[validate(length(min = 1, message = "Name is required"))]
     pub name: Option<String>,
