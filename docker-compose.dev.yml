@@ -82,7 +82,7 @@ services:
       - mebayu_network
 
   loki:
-    image: grafana/loki:2.9.0
+    image: grafana/loki:latest
     container_name: mebayu_loki
     ports:
       - "3100:3100"
@@ -91,7 +91,7 @@ services:
       - mebayu_network
 
   promtail:
-    image: grafana/promtail:2.9.0
+    image: grafana/promtail:latest
     container_name: mebayu_promtail
     volumes:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro

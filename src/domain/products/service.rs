@@ -52,8 +52,8 @@ impl<R: ProductRepository> ProductServiceImpl<R> {
     pub async fn create(&self, req: CreateProductRequest) -> Result<Product, AppError> {
         let product = Product {
             id: Uuid::new_v4(),
-            category_id: req.category_id.unwrap(),
-            material_id: req.material_id,
+            category_ids: req.category_ids,
+            material_ids: req.material_ids,
             name: req.name.unwrap(),
             material: req.material.unwrap(),
             price: req.price.unwrap(),
@@ -61,8 +61,8 @@ impl<R: ProductRepository> ProductServiceImpl<R> {
             status: req.status.unwrap(),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
-            category: None,
-            product_material: None,
+            categories: vec![],
+            product_materials: vec![],
         };
 
         self.repository.create(&product).await
@@ -72,8 +72,8 @@ impl<R: ProductRepository> ProductServiceImpl<R> {
         let product = self.repository.find_by_id(id).await?;
         let product = Product {
             id,
-            category_id: req.category_id.unwrap_or(product.category_id),
-            material_id: req.material_id.or(product.material_id),
+            category_ids: req.category_ids.unwrap_or(product.category_ids),
+            material_ids: req.material_ids.unwrap_or(product.material_ids),
             name: req.name.unwrap_or(product.name),
             material: req.material.unwrap_or(product.material),
             price: req.price.unwrap_or(product.price),
@@ -81,8 +81,8 @@ impl<R: ProductRepository> ProductServiceImpl<R> {
             status: req.status.unwrap_or(product.status),
             created_at: product.created_at,
             updated_at: chrono::Utc::now(),
-            category: None,
-            product_material: None,
+            categories: vec![],
+            product_materials: vec![],
         };
 
         self.repository.update(id, &product).await

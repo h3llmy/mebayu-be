@@ -4,9 +4,8 @@ use validator::Validate;
 
 #[derive(Deserialize, Validate, Debug)]
 pub struct UpdateProductRequest {
-    pub category_id: Option<Uuid>,
-
-    pub material_id: Option<Uuid>,
+    pub category_ids: Option<Vec<Uuid>>,
+    pub material_ids: Option<Vec<Uuid>>,
 
     #[validate(length(min = 1, message = "Name is required"))]
     pub name: Option<String>,
