@@ -7,11 +7,12 @@ use crate::{
         auth::dto::{AuthResponseDto, LoginDto, RefreshTokenDto, RegisterDto},
         users::{
             dto::{CreateUserDto, UserResponseDto},
+            entity::UserRole,
             service::{UserRepository, UserServiceImpl},
         },
     },
 };
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 use uuid::Uuid;
 
 pub struct AuthService<R: UserRepository> {
@@ -43,7 +44,11 @@ impl<R: UserRepository> AuthService<R> {
             ));
         }
 
-        let tokens = jwt::generate_token_pair(user.id, user.role.clone(), &self.jwt_secret)?;
+        let tokens = jwt::generate_token_pair(
+            user.id,
+            UserRole::from_str(&user.role).unwrap(),
+            &self.jwt_secret,
+        )?;
 
         Ok(AuthResponseDto {
             user: UserResponseDto::from(user),
@@ -64,8 +69,11 @@ impl<R: UserRepository> AuthService<R> {
         };
 
         let created_user = self.user_service.create(create_user_dto).await?;
-        let tokens =
-            jwt::generate_token_pair(created_user.id, created_user.role.clone(), &self.jwt_secret)?;
+        let tokens = jwt::generate_token_pair(
+            created_user.id,
+            UserRole::from_str(&created_user.role).unwrap(),
+            &self.jwt_secret,
+        )?;
 
         Ok(AuthResponseDto {
             user: UserResponseDto::from(created_user),
@@ -84,7 +92,11 @@ impl<R: UserRepository> AuthService<R> {
         }
 
         let user = self.user_service.get_by_id(claims.sub).await?;
-        let tokens = jwt::generate_token_pair(user.id, user.role.clone(), &self.jwt_secret)?;
+        let tokens = jwt::generate_token_pair(
+            user.id,
+            UserRole::from_str(&user.role).unwrap(),
+            &self.jwt_secret,
+        )?;
 
         Ok(AuthResponseDto {
             user: UserResponseDto::from(user),
