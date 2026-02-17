@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::domain::users::entity::{User, UserRole};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -19,7 +21,7 @@ impl From<User> for UserResponseDto {
             id: user.id,
             username: user.username,
             email: user.email,
-            role: user.role,
+            role: UserRole::from_str(&user.role).unwrap(),
             created_at: user.created_at,
             updated_at: user.updated_at,
         }

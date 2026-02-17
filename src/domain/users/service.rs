@@ -70,7 +70,7 @@ impl<R: UserRepository> UserServiceImpl<R> {
             username: req.username,
             email: req.email,
             password_hash,
-            role: UserRole::User,
+            role: UserRole::User.to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };

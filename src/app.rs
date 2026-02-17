@@ -6,7 +6,11 @@ use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 
 use crate::{
-    core::{config::Config, error::AppError, middleware::rate_limiter::rate_limiter_middleware},
+    core::{
+        config::Config,
+        error::AppError,
+        middleware::{metrics, rate_limiter::rate_limiter_middleware},
+    },
     domain::{
         auth::service::AuthService, product_categories::service::ProductCategoryServiceImpl,
         product_materials::service::ProductMaterialServiceImpl,
@@ -86,9 +90,7 @@ pub async fn build_app(pool: PgPool, config: Config) -> Router {
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
-                .layer(middleware::from_fn(
-                    crate::core::middleware::metrics::track_metrics,
-                )),
+                .layer(middleware::from_fn(metrics::track_metrics)),
         )
         .with_state(state)
 }
