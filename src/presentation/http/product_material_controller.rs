@@ -9,6 +9,7 @@ use uuid::Uuid;
 use crate::{
     core::{
         error::AppError,
+        middleware::auth::AuthUser,
         validation::{ValidatedJson, ValidatedQuery},
     },
     domain::product_materials::{
@@ -39,9 +40,11 @@ async fn get_all(
 }
 
 async fn create(
+    auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
     ValidatedJson(payload): ValidatedJson<CreateProductMaterialRequest>,
 ) -> Result<Json<ApiResponse<ProductMaterial>>, AppError> {
+    auth_user.require_admin()?;
     let material = state.product_material_service.create(payload).await?;
     Ok(Json(ApiResponse { data: material }))
 }
@@ -55,18 +58,22 @@ async fn get_by_id(
 }
 
 async fn update(
+    auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
     ValidatedJson(payload): ValidatedJson<UpdateProductMaterialRequest>,
 ) -> Result<Json<ApiResponse<ProductMaterial>>, AppError> {
+    auth_user.require_admin()?;
     let material = state.product_material_service.update(id, payload).await?;
     Ok(Json(ApiResponse { data: material }))
 }
 
 async fn delete(
+    auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<()>>, AppError> {
+    auth_user.require_admin()?;
     state.product_material_service.delete(id).await?;
     Ok(Json(ApiResponse { data: () }))
 }
