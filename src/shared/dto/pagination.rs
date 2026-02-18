@@ -9,9 +9,9 @@ pub enum SortOrder {
 
 #[derive(Debug, Deserialize, Serialize, Clone, Validate)]
 pub struct PaginationQuery {
-    #[validate(range(min = 1, message = "Page must be at least 1"))]
+    #[validate(range(min = 1))]
     pub page: Option<u32>,
-    #[validate(range(min = 1, max = 100, message = "Limit must be between 1 and 100"))]
+    #[validate(range(min = 1))]
     pub limit: Option<u32>,
     pub search: Option<String>,
     pub sort: Option<String>,
