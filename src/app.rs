@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use axum::{Router, middleware, routing::get};
+use metrics_exporter_prometheus::PrometheusBuilder;
 use sqlx::PgPool;
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
@@ -75,7 +76,7 @@ pub async fn build_app(pool: PgPool, config: Config) -> Router {
             rate_limiter_middleware,
         ));
 
-    let recorder_handle = metrics_exporter_prometheus::PrometheusBuilder::new()
+    let recorder_handle = PrometheusBuilder::new()
         .install_recorder()
         .expect("failed to install Prometheus recorder");
 

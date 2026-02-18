@@ -1,6 +1,5 @@
 use axum::{
-    body::to_bytes,
-    extract::{FromRequest, FromRequestParts, Query, Request},
+    extract::{FromRequest, FromRequestParts, Json, Query, Request},
     http::request::Parts,
 };
 use serde::de::DeserializeOwned;
@@ -10,53 +9,24 @@ use validator::{Validate, ValidationErrors};
 use crate::core::error::AppError;
 
 //
-// -----------------------------
+// ============================================================
 // JSON VALIDATION
-// -----------------------------
+// ============================================================
 //
 
 pub struct ValidatedJson<T>(pub T);
 
 impl<S, T> FromRequest<S> for ValidatedJson<T>
 where
-    T: DeserializeOwned + Validate + 'static,
+    T: DeserializeOwned + Validate,
     S: Send + Sync,
 {
     type Rejection = AppError;
 
-    async fn from_request(req: Request, _state: &S) -> Result<Self, Self::Rejection> {
-        // 1MB limit
-        let bytes = to_bytes(req.into_body(), 1024 * 1024)
+    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
+        let Json(value) = Json::<T>::from_request(req, state)
             .await
-            .map_err(|err| {
-                let mut errors = HashMap::new();
-                errors.insert("body".to_string(), vec![err.to_string()]);
-                AppError::Validation(errors)
-            })?;
-
-        // Use serde_path_to_error for better error path tracking
-        let mut deserializer = serde_json::Deserializer::from_slice(&bytes);
-
-        let value: T = serde_path_to_error::deserialize(&mut deserializer).map_err(|err| {
-            let mut errors = HashMap::new();
-
-            let path = err.path().to_string();
-            let inner_err = err.into_inner();
-            let msg = inner_err.to_string();
-
-            let clean_msg = clean_serde_error(&path, &msg);
-
-            errors.insert(
-                if path.is_empty() {
-                    "body".to_string()
-                } else {
-                    path
-                },
-                vec![clean_msg],
-            );
-
-            AppError::Validation(errors)
-        })?;
+            .map_err(handle_json_rejection)?;
 
         value.validate().map_err(map_validation_errors)?;
 
@@ -64,10 +34,49 @@ where
     }
 }
 
+fn handle_json_rejection(err: axum::extract::rejection::JsonRejection) -> AppError {
+    use axum::extract::rejection::JsonRejection::*;
+
+    let mut errors = HashMap::new();
+
+    match err {
+        MissingJsonContentType(_) => {
+            errors.insert(
+                "body".to_string(),
+                vec!["Content-Type must be application/json".to_string()],
+            );
+        }
+
+        JsonSyntaxError(_) => {
+            errors.insert("body".to_string(), vec!["Malformed JSON".to_string()]);
+        }
+
+        JsonDataError(e) => {
+            errors.insert(
+                "body".to_string(),
+                vec![format!("Invalid request data: {}", e)],
+            );
+        }
+
+        BytesRejection(_) => {
+            errors.insert(
+                "body".to_string(),
+                vec!["Failed to read request body".to_string()],
+            );
+        }
+
+        _ => {
+            errors.insert("body".to_string(), vec!["Invalid request body".to_string()]);
+        }
+    }
+
+    AppError::Validation(errors)
+}
+
 //
-// -----------------------------
+// ============================================================
 // QUERY VALIDATION
-// -----------------------------
+// ============================================================
 //
 
 pub struct ValidatedQuery<T>(pub T);
@@ -82,11 +91,7 @@ where
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let Query(value) = Query::<T>::from_request_parts(parts, state)
             .await
-            .map_err(|err| {
-                let mut errors = HashMap::new();
-                errors.insert("query".to_string(), vec![err.to_string()]);
-                AppError::Validation(errors)
-            })?;
+            .map_err(handle_query_rejection)?;
 
         value.validate().map_err(map_validation_errors)?;
 
@@ -94,10 +99,21 @@ where
     }
 }
 
+fn handle_query_rejection(err: axum::extract::rejection::QueryRejection) -> AppError {
+    let mut errors = HashMap::new();
+
+    errors.insert(
+        "query".to_string(),
+        vec![format!("Invalid query parameters: {}", err)],
+    );
+
+    AppError::Validation(errors)
+}
+
 //
-// -----------------------------
-// SHARED HELPERS
-// -----------------------------
+// ============================================================
+// SHARED VALIDATION ERROR MAPPER
+// ============================================================
 //
 
 fn map_validation_errors(err: ValidationErrors) -> AppError {
@@ -118,27 +134,4 @@ fn map_validation_errors(err: ValidationErrors) -> AppError {
     }
 
     AppError::Validation(errors)
-}
-
-fn clean_serde_error(path: &str, msg: &str) -> String {
-    if msg.contains("missing field") {
-        format!("{} is required", capitalize(path))
-    } else if msg.contains("invalid type") {
-        if let Some(expected) = msg.split(", expected ").nth(1) {
-            let type_info = expected.split(" at line ").next().unwrap_or(expected);
-            format!("Invalid data type. Expected {}", type_info)
-        } else {
-            "Invalid data type".to_string()
-        }
-    } else {
-        msg.to_string()
-    }
-}
-
-fn capitalize(s: &str) -> String {
-    let mut chars = s.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
-    }
 }

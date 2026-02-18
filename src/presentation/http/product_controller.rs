@@ -40,12 +40,12 @@ async fn get_all(
 }
 
 async fn create(
-    auth_user: AuthUser,
+    // auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
-    ValidatedJson(payload): ValidatedJson<CreateProductRequest>,
+    ValidatedJson(req): ValidatedJson<CreateProductRequest>,
 ) -> Result<Json<ApiResponse<Product>>, AppError> {
-    auth_user.require_admin()?;
-    let product = state.product_service.create(payload).await?;
+    // auth_user.require_admin()?;
+    let product = state.product_service.create(req).await?;
     Ok(Json(ApiResponse { data: product }))
 }
 

@@ -9,7 +9,10 @@ use crate::{
     domain::{
         product_categories::entity::ProductCategory,
         product_materials::entity::ProductMaterial,
-        products::{entity::Product, service::ProductRepository},
+        products::{
+            entity::{Product, ProductImage},
+            service::ProductRepository,
+        },
     },
     shared::dto::pagination::{PaginationQuery, SortOrder},
 };
@@ -106,7 +109,7 @@ impl ProductRepository for ProductRepositoryImpl {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| AppError::Database(e.to_string()))?;
+        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         // Fetch materials for all products
         let materials_rows = sqlx::query!(
@@ -120,7 +123,20 @@ impl ProductRepository for ProductRepositoryImpl {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| AppError::Database(e.to_string()))?;
+        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+
+        // Fetch images for all products
+        let images_rows = sqlx::query(
+            r#"
+            SELECT *
+            FROM product_images
+            WHERE product_id = ANY($1)
+            "#,
+        )
+        .bind(&product_ids)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         let products = rows
             .into_iter()
@@ -149,6 +165,18 @@ impl ProductRepository for ProductRepositoryImpl {
                     })
                     .collect();
 
+                let images: Vec<ProductImage> = images_rows
+                    .iter()
+                    .filter(|ir| ir.get::<Uuid, _>("product_id") == id)
+                    .map(|ir| ProductImage {
+                        id: ir.get("id"),
+                        product_id: ir.get("product_id"),
+                        url: ir.get("url"),
+                        created_at: ir.get("created_at"),
+                        updated_at: ir.get("updated_at"),
+                    })
+                    .collect();
+
                 Product {
                     id,
                     name: r.get("name"),
@@ -162,6 +190,7 @@ impl ProductRepository for ProductRepositoryImpl {
                     material_ids: product_materials.iter().map(|m| m.id).collect(),
                     categories,
                     product_materials,
+                    images,
                 }
             })
             .collect();
@@ -173,7 +202,7 @@ impl ProductRepository for ProductRepositoryImpl {
         let product_row = sqlx::query!("SELECT * FROM products WHERE id = $1", id)
             .fetch_optional(&self.pool)
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?
             .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
 
         let categories = sqlx::query_as!(
@@ -188,7 +217,7 @@ impl ProductRepository for ProductRepositoryImpl {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| AppError::Database(e.to_string()))?;
+        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         let product_materials = sqlx::query_as!(
             ProductMaterial,
@@ -202,7 +231,19 @@ impl ProductRepository for ProductRepositoryImpl {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| AppError::Database(e.to_string()))?;
+        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+
+        let images = sqlx::query_as::<_, ProductImage>(
+            r#"
+            SELECT *
+            FROM product_images
+            WHERE product_id = $1
+            "#,
+        )
+        .bind(id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         Ok(Product {
             id: product_row.id,
@@ -217,6 +258,7 @@ impl ProductRepository for ProductRepositoryImpl {
             material_ids: product_materials.iter().map(|m| m.id).collect(),
             categories,
             product_materials,
+            images,
         })
     }
 
@@ -225,7 +267,7 @@ impl ProductRepository for ProductRepositoryImpl {
             .pool
             .begin()
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         // 1. Check if all categories exist
         if !product.category_ids.is_empty() {
@@ -235,7 +277,7 @@ impl ProductRepository for ProductRepositoryImpl {
             )
             .fetch_one(&mut *tx)
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?
             .count
             .unwrap_or(0);
 
@@ -277,7 +319,7 @@ impl ProductRepository for ProductRepositoryImpl {
             )
             .execute(&mut *tx)
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
         }
 
         // 4. Insert material relations
@@ -289,12 +331,27 @@ impl ProductRepository for ProductRepositoryImpl {
             )
             .execute(&mut *tx)
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+        }
+
+        // 5. Insert image relations
+        for image in &product.images {
+            sqlx::query(
+                "INSERT INTO product_images (id, product_id, url, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)",
+            )
+            .bind(image.id)
+            .bind(product.id)
+            .bind(&image.url)
+            .bind(image.created_at)
+            .bind(image.updated_at)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
         }
 
         tx.commit()
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         self.find_by_id(product.id).await
     }
@@ -304,7 +361,7 @@ impl ProductRepository for ProductRepositoryImpl {
             .pool
             .begin()
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         // 1. Update product basic fields
         sqlx::query!(
@@ -329,7 +386,7 @@ impl ProductRepository for ProductRepositoryImpl {
         )
         .execute(&mut *tx)
         .await
-        .map_err(|e| AppError::Database(e.to_string()))?;
+        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         // Add new
         for category_id in &product.category_ids {
@@ -340,7 +397,7 @@ impl ProductRepository for ProductRepositoryImpl {
             )
             .execute(&mut *tx)
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
         }
 
         // 3. Update material relations
@@ -351,7 +408,7 @@ impl ProductRepository for ProductRepositoryImpl {
         )
         .execute(&mut *tx)
         .await
-        .map_err(|e| AppError::Database(e.to_string()))?;
+        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         // Add new
         for material_id in &product.material_ids {
@@ -362,12 +419,35 @@ impl ProductRepository for ProductRepositoryImpl {
             )
             .execute(&mut *tx)
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+        }
+
+        // 4. Update image relations
+        // Clear existing
+        sqlx::query("DELETE FROM product_images WHERE product_id = $1")
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+
+        // Add new
+        for image in &product.images {
+            sqlx::query(
+                "INSERT INTO product_images (id, product_id, url, is_primary, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)",
+            )
+            .bind(image.id)
+            .bind(id)
+            .bind(&image.url)
+            .bind(image.created_at)
+            .bind(image.updated_at)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
         }
 
         tx.commit()
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         self.find_by_id(id).await
     }

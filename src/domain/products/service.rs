@@ -8,7 +8,7 @@ use crate::{
     shared::dto::{pagination::PaginationQuery, response::PaginationResponse},
 };
 
-use super::entity::Product;
+use super::entity::{Product, ProductImage};
 
 #[async_trait]
 pub trait ProductRepository: Send + Sync {
@@ -50,10 +50,11 @@ impl<R: ProductRepository> ProductServiceImpl<R> {
     }
 
     pub async fn create(&self, req: CreateProductRequest) -> Result<Product, AppError> {
+        let id = Uuid::new_v4();
         let product = Product {
-            id: Uuid::new_v4(),
-            category_ids: req.category_ids,
-            material_ids: req.material_ids,
+            id,
+            category_ids: req.category_ids.unwrap(),
+            material_ids: req.material_ids.unwrap(),
             name: req.name.unwrap(),
             material: req.material.unwrap(),
             price: req.price.unwrap(),
@@ -63,6 +64,18 @@ impl<R: ProductRepository> ProductServiceImpl<R> {
             updated_at: chrono::Utc::now(),
             categories: vec![],
             product_materials: vec![],
+            images: req
+                .image_urls
+                .unwrap_or_default()
+                .into_iter()
+                .map(|url| ProductImage {
+                    id: Uuid::new_v4(),
+                    product_id: id,
+                    url,
+                    created_at: chrono::Utc::now(),
+                    updated_at: chrono::Utc::now(),
+                })
+                .collect(),
         };
 
         self.repository.create(&product).await
@@ -83,6 +96,20 @@ impl<R: ProductRepository> ProductServiceImpl<R> {
             updated_at: chrono::Utc::now(),
             categories: vec![],
             product_materials: vec![],
+            images: req
+                .image_urls
+                .map(|urls| {
+                    urls.into_iter()
+                        .map(|url| ProductImage {
+                            id: Uuid::new_v4(),
+                            product_id: id,
+                            url,
+                            created_at: chrono::Utc::now(),
+                            updated_at: chrono::Utc::now(),
+                        })
+                        .collect()
+                })
+                .unwrap_or(product.images),
         };
 
         self.repository.update(id, &product).await

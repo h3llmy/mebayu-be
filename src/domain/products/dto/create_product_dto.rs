@@ -4,10 +4,13 @@ use validator::Validate;
 
 #[derive(Deserialize, Validate, Debug)]
 pub struct CreateProductRequest {
+    #[validate(required(message = "Category is required"))]
     #[validate(length(min = 1, message = "At least one category is required"))]
-    pub category_ids: Vec<Uuid>,
+    pub category_ids: Option<Vec<Uuid>>,
 
-    pub material_ids: Vec<Uuid>,
+    #[validate(required(message = "Material is required"))]
+    #[validate(length(min = 1, message = "At least one material is required"))]
+    pub material_ids: Option<Vec<Uuid>>,
 
     #[validate(required(message = "Name is required"))]
     #[validate(length(min = 1, message = "Name is required"))]
@@ -28,4 +31,8 @@ pub struct CreateProductRequest {
     #[validate(required(message = "Status is required"))]
     #[validate(length(min = 1, message = "Status is required"))]
     pub status: Option<String>,
+
+    #[validate(length(min = 1, message = "At least one image is required"))]
+    #[validate(required(message = "Image is required"))]
+    pub image_urls: Option<Vec<String>>,
 }

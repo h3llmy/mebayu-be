@@ -21,4 +21,6 @@ pub struct UpdateProductRequest {
 
     #[validate(length(min = 1, message = "Status is required"))]
     pub status: Option<String>,
+
+    pub image_urls: Option<Vec<String>>,
 }

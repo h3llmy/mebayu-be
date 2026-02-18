@@ -28,4 +28,16 @@ pub struct Product {
     #[serde(skip_deserializing)]
     #[sqlx(default)]
     pub product_materials: Vec<ProductMaterial>,
+    #[serde(skip_deserializing)]
+    #[sqlx(default)]
+    pub images: Vec<ProductImage>,
+}
+
+#[derive(Clone, Serialize, Deserialize, FromRow, Debug)]
+pub struct ProductImage {
+    pub id: Uuid,
+    pub product_id: Uuid,
+    pub url: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }

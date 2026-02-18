@@ -76,30 +76,30 @@ services:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
     networks:
       - mebayu_network
 
-  loki:
-    image: grafana/loki:latest
-    container_name: mebayu_loki
-    ports:
-      - "3100:3100"
-    command: -config.file=/etc/loki/local-config.yaml
-    networks:
-      - mebayu_network
+  # loki:
+  #   image: grafana/loki:latest
+  #   container_name: mebayu_loki
+  #   ports:
+  #     - "3100:3100"
+  #   command: -config.file=/etc/loki/local-config.yaml
+  #   networks:
+  #     - mebayu_network
 
-  promtail:
-    image: grafana/promtail:latest
-    container_name: mebayu_promtail
-    volumes:
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./monitoring/promtail/promtail.yml:/etc/promtail/config.yml
-    command: -config.file=/etc/promtail/config.yml
-    networks:
-      - mebayu_network
+  # promtail:
+  #   image: grafana/promtail:latest
+  #   container_name: mebayu_promtail
+  #   volumes:
+  #     - /var/lib/docker/containers:/var/lib/docker/containers:ro
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - ./monitoring/promtail/promtail.yml:/etc/promtail/config.yml
+  #   command: -config.file=/etc/promtail/config.yml
+  #   networks:
+  #     - mebayu_network
 
   grafana:
     image: grafana/grafana:latest
@@ -116,4 +116,3 @@ services:
       - prometheus
     networks:
       - mebayu_network
-
