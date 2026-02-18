@@ -1,3 +1,4 @@
+use crate::core::error::ErrorResponse;
 use crate::domain::{
     auth::dto::*, product_categories::dto::*, product_categories::entity::*,
     product_materials::dto::*, product_materials::entity::*, products::dto::*, products::entity::*,
@@ -47,7 +48,7 @@ use utoipa::{
             CreateProductCategoryRequest, UpdateProductCategoryRequest, ProductCategory,
             CreateProductMaterialRequest, UpdateProductMaterialRequest, ProductMaterial,
             CreateUserDto, UpdateUserDto, UserResponseDto, UserRole,
-            PaginationQuery, SortOrder,
+            PaginationQuery, SortOrder, ErrorResponse,
             ApiResponse<Product>, ApiResponse<UserResponseDto>, ApiResponse<ProductCategory>, ApiResponse<ProductMaterial>,
             PaginationResponse<Vec<Product>>, PaginationResponse<Vec<ProductCategory>>, PaginationResponse<Vec<ProductMaterial>>, PaginationResponse<Vec<UserResponseDto>>
         )

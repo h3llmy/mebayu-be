@@ -1,5 +1,9 @@
 use crate::{
-    core::{error::AppError, middleware::auth::AuthUser, validation::ValidatedJson},
+    core::{
+        error::{AppError, ErrorResponse},
+        middleware::auth::AuthUser,
+        validation::ValidatedJson,
+    },
     domain::{
         auth::dto::{AuthResponseDto, LoginDto, RefreshTokenDto, RegisterDto},
         users::dto::user_response_dto::UserResponseDto,
@@ -26,7 +30,7 @@ pub fn auth_routes() -> Router<Arc<AppState>> {
     path = "/api/v1/auth/profile",
     responses(
         (status = 200, description = "Get current user profile", body = UserResponseDto),
-        (status = 401, description = "Unauthorized")
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
     ),
     security(
         ("jwt" = [])
@@ -46,7 +50,7 @@ pub async fn get_profile(
     request_body = LoginDto,
     responses(
         (status = 200, description = "Login successful", body = AuthResponseDto),
-        (status = 401, description = "Invalid credentials")
+        (status = 401, description = "Invalid credentials", body = ErrorResponse)
     )
 )]
 pub async fn login(
@@ -63,7 +67,7 @@ pub async fn login(
     request_body = RegisterDto,
     responses(
         (status = 201, description = "User registered successfully", body = AuthResponseDto),
-        (status = 400, description = "Bad request")
+        (status = 400, description = "Bad request", body = ErrorResponse)
     )
 )]
 pub async fn register(
@@ -80,7 +84,7 @@ pub async fn register(
     request_body = RefreshTokenDto,
     responses(
         (status = 200, description = "Token refreshed successfully", body = AuthResponseDto),
-        (status = 401, description = "Invalid refresh token")
+        (status = 401, description = "Invalid refresh token", body = ErrorResponse)
     )
 )]
 pub async fn refresh_token(

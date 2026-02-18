@@ -19,7 +19,7 @@ pub enum AppError {
 }
 
 #[derive(Serialize, ToSchema)]
-struct ErrorResponse {
+pub struct ErrorResponse {
     message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     errors: Option<HashMap<String, Vec<String>>>,

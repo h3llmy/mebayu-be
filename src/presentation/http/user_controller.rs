@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     core::{
-        error::AppError,
+        error::{AppError, ErrorResponse},
         validation::{ValidatedJson, ValidatedQuery},
     },
     domain::users::dto::{CreateUserDto, UpdateUserDto, UserResponseDto},
@@ -34,8 +34,8 @@ pub fn routes() -> Router<Arc<AppState>> {
     ),
     responses(
         (status = 200, description = "List all users", body = PaginationResponse<Vec<UserResponseDto>>),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse)
     ),
     security(
         ("jwt" = [])
@@ -56,8 +56,8 @@ pub async fn get_all(
     path = "/api/v1/users/{id}",
     responses(
         (status = 200, description = "Get user by ID", body = UserResponseDto),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "User not found")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "User not found", body = ErrorResponse)
     ),
     params(
         ("id" = Uuid, Path, description = "User ID")
@@ -81,9 +81,9 @@ pub async fn get_by_id(
     request_body = CreateUserDto,
     responses(
         (status = 201, description = "User created successfully", body = UserResponseDto),
-        (status = 400, description = "Bad Request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden")
+        (status = 400, description = "Bad Request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse)
     ),
     security(
         ("jwt" = [])
@@ -103,10 +103,10 @@ pub async fn create(
     request_body = UpdateUserDto,
     responses(
         (status = 200, description = "User updated successfully", body = UserResponseDto),
-        (status = 400, description = "Bad Request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden"),
-        (status = 404, description = "User not found")
+        (status = 400, description = "Bad Request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "User not found", body = ErrorResponse)
     ),
     params(
         ("id" = Uuid, Path, description = "User ID")
@@ -130,9 +130,9 @@ pub async fn update(
     path = "/api/v1/users/{id}",
     responses(
         (status = 200, description = "User deleted successfully"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden"),
-        (status = 404, description = "User not found")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "User not found", body = ErrorResponse)
     ),
     params(
         ("id" = Uuid, Path, description = "User ID")

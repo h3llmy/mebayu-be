@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     core::{
-        error::AppError,
+        error::{AppError, ErrorResponse},
         middleware::auth::AuthUser,
         validation::{ValidatedJson, ValidatedQuery},
     },
@@ -55,9 +55,9 @@ pub async fn get_all(
     request_body = CreateProductMaterialRequest,
     responses(
         (status = 201, description = "Product material created successfully", body = ApiResponse<ProductMaterial>),
-        (status = 400, description = "Bad Request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden")
+        (status = 400, description = "Bad Request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse)
     ),
     security(
         ("jwt" = [])
@@ -78,7 +78,7 @@ pub async fn create(
     path = "/api/v1/product-materials/{id}",
     responses(
         (status = 200, description = "Get product material by ID", body = ApiResponse<ProductMaterial>),
-        (status = 404, description = "Product material not found")
+        (status = 404, description = "Product material not found", body = ErrorResponse)
     ),
     params(
         ("id" = Uuid, Path, description = "Product Material ID")
@@ -98,10 +98,10 @@ pub async fn get_by_id(
     request_body = UpdateProductMaterialRequest,
     responses(
         (status = 200, description = "Product material updated successfully", body = ApiResponse<ProductMaterial>),
-        (status = 400, description = "Bad Request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden"),
-        (status = 404, description = "Product material not found")
+        (status = 400, description = "Bad Request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "Product material not found", body = ErrorResponse)
     ),
     params(
         ("id" = Uuid, Path, description = "Product Material ID")
@@ -126,9 +126,9 @@ pub async fn update(
     path = "/api/v1/product-materials/{id}",
     responses(
         (status = 200, description = "Product material deleted successfully"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden"),
-        (status = 404, description = "Product material not found")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "Product material not found", body = ErrorResponse)
     ),
     params(
         ("id" = Uuid, Path, description = "Product Material ID")

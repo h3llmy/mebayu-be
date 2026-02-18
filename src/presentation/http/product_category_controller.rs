@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     core::{
-        error::AppError,
+        error::{AppError, ErrorResponse},
         middleware::auth::AuthUser,
         validation::{ValidatedJson, ValidatedQuery},
     },
@@ -56,9 +56,9 @@ pub async fn get_all(
     request_body = CreateProductCategoryRequest,
     responses(
         (status = 201, description = "Product category created successfully", body = ApiResponse<ProductCategory>),
-        (status = 400, description = "Bad Request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden")
+        (status = 400, description = "Bad Request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse)
     ),
     security(
         ("jwt" = [])
@@ -79,7 +79,7 @@ pub async fn create(
     path = "/api/v1/product-categories/{id}",
     responses(
         (status = 200, description = "Get product category by ID", body = ApiResponse<ProductCategory>),
-        (status = 404, description = "Product category not found")
+        (status = 404, description = "Product category not found", body = ErrorResponse)
     ),
     params(
         ("id" = Uuid, Path, description = "Product Category ID")
@@ -120,10 +120,10 @@ pub async fn get_all_with_product_count(
     request_body = UpdateProductCategoryRequest,
     responses(
         (status = 200, description = "Product category updated successfully", body = ApiResponse<ProductCategory>),
-        (status = 400, description = "Bad Request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden"),
-        (status = 404, description = "Product category not found")
+        (status = 400, description = "Bad Request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "Product category not found", body = ErrorResponse)
     ),
     params(
         ("id" = Uuid, Path, description = "Product Category ID")
@@ -148,9 +148,9 @@ pub async fn update(
     path = "/api/v1/product-categories/{id}",
     responses(
         (status = 200, description = "Product category deleted successfully"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden"),
-        (status = 404, description = "Product category not found")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "Product category not found", body = ErrorResponse)
     ),
     params(
         ("id" = Uuid, Path, description = "Product Category ID")

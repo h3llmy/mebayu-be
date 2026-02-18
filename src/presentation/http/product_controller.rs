@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     core::{
-        error::AppError,
+        error::{AppError, ErrorResponse},
         middleware::auth::AuthUser,
         validation::{ValidatedJson, ValidatedQuery},
     },
@@ -55,9 +55,9 @@ pub async fn get_all(
     request_body = CreateProductRequest,
     responses(
         (status = 201, description = "Product created successfully", body = ApiResponse<Product>),
-        (status = 400, description = "Bad Request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden")
+        (status = 400, description = "Bad Request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse)
     ),
     security(
         ("jwt" = [])
@@ -78,7 +78,7 @@ pub async fn create(
     path = "/api/v1/products/{id}",
     responses(
         (status = 200, description = "Get product by ID", body = ApiResponse<Product>),
-        (status = 404, description = "Product not found")
+        (status = 404, description = "Product not found", body = ErrorResponse)
     ),
     params(
         ("id" = Uuid, Path, description = "Product ID")
@@ -98,10 +98,10 @@ pub async fn get_by_id(
     request_body = UpdateProductRequest,
     responses(
         (status = 200, description = "Product updated successfully", body = ApiResponse<Product>),
-        (status = 400, description = "Bad Request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden"),
-        (status = 404, description = "Product not found")
+        (status = 400, description = "Bad Request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "Product not found", body = ErrorResponse)
     ),
     params(
         ("id" = Uuid, Path, description = "Product ID")
@@ -126,9 +126,9 @@ pub async fn update(
     path = "/api/v1/products/{id}",
     responses(
         (status = 200, description = "Product deleted successfully"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden"),
-        (status = 404, description = "Product not found")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "Product not found", body = ErrorResponse)
     ),
     params(
         ("id" = Uuid, Path, description = "Product ID")
