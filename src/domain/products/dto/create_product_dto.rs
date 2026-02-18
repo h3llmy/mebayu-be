@@ -4,35 +4,35 @@ use validator::Validate;
 
 #[derive(Deserialize, Validate, Debug)]
 pub struct CreateProductRequest {
-    #[validate(required(message = "Category is required"))]
-    #[validate(length(min = 1, message = "At least one category is required"))]
+    #[validate(required)]
+    #[validate(length(min = 1))]
     pub category_ids: Option<Vec<Uuid>>,
 
-    #[validate(required(message = "Material is required"))]
-    #[validate(length(min = 1, message = "At least one material is required"))]
+    #[validate(required)]
+    #[validate(length(min = 1))]
     pub material_ids: Option<Vec<Uuid>>,
 
-    #[validate(required(message = "Name is required"))]
-    #[validate(length(min = 1, message = "Name is required"))]
+    #[validate(required)]
+    #[validate(length(min = 1))]
     pub name: Option<String>,
 
-    #[validate(required(message = "Material is required"))]
-    #[validate(length(min = 1, message = "Material is required"))]
+    #[validate(required)]
+    #[validate(length(min = 1))]
     pub material: Option<String>,
 
-    #[validate(required(message = "Price is required"))]
-    #[validate(range(min = 0.01, message = "Price must be greater than 0"))]
+    #[validate(required)]
+    #[validate(range(min = 0.01))]
     pub price: Option<f64>,
 
-    #[validate(required(message = "Description is required"))]
-    #[validate(length(min = 1, message = "Description is required"))]
+    #[validate(required)]
+    #[validate(length(min = 1))]
     pub description: Option<String>,
 
-    #[validate(required(message = "Status is required"))]
-    #[validate(length(min = 1, message = "Status is required"))]
+    #[validate(required)]
+    #[validate(length(min = 1))]
     pub status: Option<String>,
 
-    #[validate(length(min = 1, message = "At least one image is required"))]
-    #[validate(required(message = "Image is required"))]
+    #[validate(required)]
+    #[validate(length(min = 1))]
     pub image_urls: Option<Vec<String>>,
 }

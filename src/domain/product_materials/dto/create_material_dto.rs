@@ -3,7 +3,7 @@ use validator::Validate;
 
 #[derive(Debug, Deserialize, Serialize, Validate)]
 pub struct CreateProductMaterialRequest {
-    #[validate(required(message = "Name is required"))]
-    #[validate(length(min = 1, message = "Name is required"))]
+    #[validate(required)]
+    #[validate(length(min = 1))]
     pub name: Option<String>,
 }

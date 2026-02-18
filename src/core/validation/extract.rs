@@ -122,12 +122,7 @@ fn map_validation_errors(err: ValidationErrors) -> AppError {
     for (field, field_errors) in err.field_errors() {
         let messages: Vec<String> = field_errors
             .iter()
-            .map(|e| {
-                e.message
-                    .as_ref()
-                    .map(|m| m.to_string())
-                    .unwrap_or_else(|| format!("{} is invalid", field))
-            })
+            .map(|e| e.code.as_ref().to_string())
             .collect();
 
         errors.insert(field.to_string(), messages);

@@ -3,15 +3,15 @@ use validator::Validate;
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct RegisterDto {
-    #[validate(required(message = "Username is required"))]
-    #[validate(length(min = 3, message = "Username must be at least 3 characters"))]
+    #[validate(required)]
+    #[validate(length(min = 3))]
     pub username: Option<String>,
 
-    #[validate(required(message = "Email is required"))]
-    #[validate(email(message = "Invalid email format"))]
+    #[validate(required)]
+    #[validate(email)]
     pub email: Option<String>,
 
-    #[validate(required(message = "Password is required"))]
-    #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
+    #[validate(required)]
+    #[validate(length(min = 8))]
     pub password: Option<String>,
 }

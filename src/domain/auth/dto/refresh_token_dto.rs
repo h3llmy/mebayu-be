@@ -3,6 +3,6 @@ use validator::Validate;
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct RefreshTokenDto {
-    #[validate(required(message = "Refresh token is required"))]
+    #[validate(required)]
     pub refresh_token: Option<String>,
 }

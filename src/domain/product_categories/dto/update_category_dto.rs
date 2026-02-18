@@ -3,6 +3,6 @@ use validator::Validate;
 
 #[derive(Debug, Deserialize, Serialize, Validate)]
 pub struct UpdateProductCategoryRequest {
-    #[validate(length(min = 1, message = "Name must not be empty"))]
+    #[validate(length(min = 1))]
     pub name: Option<String>,
 }

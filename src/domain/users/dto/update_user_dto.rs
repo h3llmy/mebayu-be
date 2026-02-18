@@ -3,12 +3,12 @@ use validator::Validate;
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct UpdateUserDto {
-    #[validate(length(min = 3, message = "Username must be at least 3 characters"))]
+    #[validate(length(min = 3))]
     pub username: Option<String>,
 
-    #[validate(email(message = "Invalid email format"))]
+    #[validate(email)]
     pub email: Option<String>,
 
-    #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
+    #[validate(length(min = 8))]
     pub password: Option<String>,
 }
