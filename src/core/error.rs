@@ -9,6 +9,7 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub enum AppError {
     NotFound(String),
+    TooManyRequests(String),
     Validation(HashMap<String, Vec<String>>),
     Database(String),
     Unauthorized(String),
@@ -27,6 +28,7 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, message, errors) = match self {
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg, None),
+            AppError::TooManyRequests(msg) => (StatusCode::TOO_MANY_REQUESTS, msg, None),
             AppError::Validation(errs) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "Validation Failed".to_string(),

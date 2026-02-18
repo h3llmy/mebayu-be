@@ -1,4 +1,4 @@
-use crate::shared::app_state::AppState;
+use crate::{core::error::AppError, shared::app_state::AppState};
 use axum::{
     extract::{ConnectInfo, State},
     http::{Request, StatusCode},
@@ -12,12 +12,15 @@ pub async fn rate_limiter_middleware(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     request: Request<axum::body::Body>,
     next: Next,
-) -> Result<Response, StatusCode> {
+) -> Result<Response, AppError> {
     let mut conn = state
         .redis_client
         .get_multiplexed_async_connection()
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_| {
+            tracing::error!("Redis error: {}", e);
+            AppError::Database("Redis error".to_string())
+        })?;
 
     let ip = addr.ip().to_string();
     let key = format!("rate_limit:{}", ip);
@@ -29,12 +32,13 @@ pub async fn rate_limiter_middleware(
         .query_async(&mut conn)
         .await
         .map_err(|e| {
-            eprintln!("Redis error: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
+            tracing::error!("Redis error: {}", e);
+            AppError::Database("Redis error".to_string())
         })?;
 
     if count > state.config.rate_limit_requests as i64 {
-        return Err(StatusCode::TOO_MANY_REQUESTS);
+        tracing::warn!("Too many requests from {}: {}", ip, count);
+        return Err(AppError::TooManyRequests("Too many requests".to_string()));
     }
 
     Ok(next.run(request).await)
