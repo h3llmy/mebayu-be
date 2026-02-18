@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use validator::Validate;
 
-#[derive(Debug, Serialize, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize, Validate, ToSchema)]
 pub struct RefreshTokenDto {
-    #[validate(required)]
-    pub refresh_token: Option<String>,
+    pub refresh_token: String,
 }

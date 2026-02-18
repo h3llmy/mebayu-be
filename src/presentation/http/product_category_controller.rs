@@ -32,7 +32,17 @@ pub fn category_routes() -> Router<Arc<AppState>> {
         .route("/with-product-count", get(get_all_with_product_count))
 }
 
-async fn get_all(
+#[utoipa::path(
+    get,
+    path = "/api/v1/product-categories",
+    params(
+        PaginationQuery
+    ),
+    responses(
+        (status = 200, description = "List all product categories", body = PaginationResponse<Vec<ProductCategory>>),
+    )
+)]
+pub async fn get_all(
     State(state): State<Arc<AppState>>,
     ValidatedQuery(query): ValidatedQuery<PaginationQuery>,
 ) -> Result<Json<PaginationResponse<Vec<ProductCategory>>>, AppError> {
@@ -40,7 +50,21 @@ async fn get_all(
     Ok(Json(response))
 }
 
-async fn create(
+#[utoipa::path(
+    post,
+    path = "/api/v1/product-categories",
+    request_body = CreateProductCategoryRequest,
+    responses(
+        (status = 201, description = "Product category created successfully", body = ApiResponse<ProductCategory>),
+        (status = 400, description = "Bad Request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn create(
     // auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
     ValidatedJson(payload): ValidatedJson<CreateProductCategoryRequest>,
@@ -50,7 +74,18 @@ async fn create(
     Ok(Json(ApiResponse { data: category }))
 }
 
-async fn get_by_id(
+#[utoipa::path(
+    get,
+    path = "/api/v1/product-categories/{id}",
+    responses(
+        (status = 200, description = "Get product category by ID", body = ApiResponse<ProductCategory>),
+        (status = 404, description = "Product category not found")
+    ),
+    params(
+        ("id" = Uuid, Path, description = "Product Category ID")
+    )
+)]
+pub async fn get_by_id(
     State(state): State<Arc<AppState>>,
     id: Path<Uuid>,
 ) -> Result<Json<ApiResponse<ProductCategory>>, AppError> {
@@ -58,7 +93,17 @@ async fn get_by_id(
     Ok(Json(ApiResponse { data: category }))
 }
 
-async fn get_all_with_product_count(
+#[utoipa::path(
+    get,
+    path = "/api/v1/product-categories/with-product-count",
+    params(
+        PaginationQuery
+    ),
+    responses(
+        (status = 200, description = "List all product categories with product count", body = PaginationResponse<Vec<ProductCategory>>),
+    )
+)]
+pub async fn get_all_with_product_count(
     State(state): State<Arc<AppState>>,
     ValidatedQuery(query): ValidatedQuery<PaginationQuery>,
 ) -> Result<Json<PaginationResponse<Vec<ProductCategory>>>, AppError> {
@@ -69,7 +114,25 @@ async fn get_all_with_product_count(
     Ok(Json(response))
 }
 
-async fn update(
+#[utoipa::path(
+    put,
+    path = "/api/v1/product-categories/{id}",
+    request_body = UpdateProductCategoryRequest,
+    responses(
+        (status = 200, description = "Product category updated successfully", body = ApiResponse<ProductCategory>),
+        (status = 400, description = "Bad Request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Product category not found")
+    ),
+    params(
+        ("id" = Uuid, Path, description = "Product Category ID")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn update(
     auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
     id: Path<Uuid>,
@@ -80,7 +143,23 @@ async fn update(
     Ok(Json(ApiResponse { data: category }))
 }
 
-async fn delete(
+#[utoipa::path(
+    delete,
+    path = "/api/v1/product-categories/{id}",
+    responses(
+        (status = 200, description = "Product category deleted successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Product category not found")
+    ),
+    params(
+        ("id" = Uuid, Path, description = "Product Category ID")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn delete(
     auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
     id: Path<Uuid>,

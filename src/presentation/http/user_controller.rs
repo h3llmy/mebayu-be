@@ -26,7 +26,22 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/{id}", get(get_by_id).put(update).delete(delete_user))
 }
 
-async fn get_all(
+#[utoipa::path(
+    get,
+    path = "/api/v1/users",
+    params(
+        PaginationQuery
+    ),
+    responses(
+        (status = 200, description = "List all users", body = PaginationResponse<Vec<UserResponseDto>>),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn get_all(
     // auth: AuthUser,
     State(state): State<Arc<AppState>>,
     ValidatedQuery(query): ValidatedQuery<PaginationQuery>,
@@ -36,7 +51,22 @@ async fn get_all(
     Ok(Json(response))
 }
 
-async fn get_by_id(
+#[utoipa::path(
+    get,
+    path = "/api/v1/users/{id}",
+    responses(
+        (status = 200, description = "Get user by ID", body = UserResponseDto),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "User not found")
+    ),
+    params(
+        ("id" = Uuid, Path, description = "User ID")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn get_by_id(
     _auth: AuthUser,
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
@@ -45,7 +75,21 @@ async fn get_by_id(
     Ok(Json(UserResponseDto::from(user)))
 }
 
-async fn create(
+#[utoipa::path(
+    post,
+    path = "/api/v1/users",
+    request_body = CreateUserDto,
+    responses(
+        (status = 201, description = "User created successfully", body = UserResponseDto),
+        (status = 400, description = "Bad Request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn create(
     State(state): State<Arc<AppState>>,
     ValidatedJson(req): ValidatedJson<CreateUserDto>,
 ) -> Result<Json<UserResponseDto>, AppError> {
@@ -53,7 +97,25 @@ async fn create(
     Ok(Json(UserResponseDto::from(user)))
 }
 
-async fn update(
+#[utoipa::path(
+    put,
+    path = "/api/v1/users/{id}",
+    request_body = UpdateUserDto,
+    responses(
+        (status = 200, description = "User updated successfully", body = UserResponseDto),
+        (status = 400, description = "Bad Request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "User not found")
+    ),
+    params(
+        ("id" = Uuid, Path, description = "User ID")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn update(
     _auth: AuthUser,
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
@@ -63,7 +125,23 @@ async fn update(
     Ok(Json(UserResponseDto::from(user)))
 }
 
-async fn delete_user(
+#[utoipa::path(
+    delete,
+    path = "/api/v1/users/{id}",
+    responses(
+        (status = 200, description = "User deleted successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "User not found")
+    ),
+    params(
+        ("id" = Uuid, Path, description = "User ID")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn delete_user(
     _auth: AuthUser,
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,

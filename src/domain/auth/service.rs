@@ -29,8 +29,8 @@ impl<R: UserRepository> AuthService<R> {
     }
 
     pub async fn login(&self, req: LoginDto) -> Result<AuthResponseDto, AppError> {
-        let username = req.username.unwrap();
-        let password_str = req.password.unwrap();
+        let username = req.username;
+        let password_str = req.password;
 
         let user = self
             .user_service
@@ -58,9 +58,9 @@ impl<R: UserRepository> AuthService<R> {
     }
 
     pub async fn register(&self, req: RegisterDto) -> Result<AuthResponseDto, AppError> {
-        let username = req.username.unwrap();
-        let email = req.email.unwrap();
-        let password_str = req.password.unwrap();
+        let username = req.username;
+        let email = req.email;
+        let password_str = req.password;
 
         let create_user_dto = CreateUserDto {
             username,
@@ -83,7 +83,7 @@ impl<R: UserRepository> AuthService<R> {
     }
 
     pub async fn refresh_token(&self, req: RefreshTokenDto) -> Result<AuthResponseDto, AppError> {
-        let refresh_token = req.refresh_token.unwrap();
+        let refresh_token = req.refresh_token;
 
         let claims = jwt::verify_token(&refresh_token, &self.jwt_secret)?;
 

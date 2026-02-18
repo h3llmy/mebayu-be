@@ -83,7 +83,7 @@ impl<R: ProductCategoryRepository> ProductCategoryServiceImpl<R> {
     ) -> Result<ProductCategory, AppError> {
         let category = ProductCategory {
             id: Uuid::new_v4(),
-            name: req.name.unwrap(),
+            name: req.name,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         };

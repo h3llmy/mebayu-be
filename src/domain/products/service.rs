@@ -53,20 +53,19 @@ impl<R: ProductRepository> ProductServiceImpl<R> {
         let id = Uuid::new_v4();
         let product = Product {
             id,
-            category_ids: req.category_ids.unwrap(),
-            material_ids: req.material_ids.unwrap(),
-            name: req.name.unwrap(),
-            material: req.material.unwrap(),
-            price: req.price.unwrap(),
-            description: req.description.unwrap(),
-            status: req.status.unwrap(),
+            category_ids: req.category_ids,
+            material_ids: req.material_ids,
+            name: req.name,
+            material: req.material,
+            price: req.price,
+            description: req.description,
+            status: req.status,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
             categories: vec![],
             product_materials: vec![],
             images: req
                 .image_urls
-                .unwrap_or_default()
                 .into_iter()
                 .map(|url| ProductImage {
                     id: Uuid::new_v4(),

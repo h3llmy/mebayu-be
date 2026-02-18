@@ -1,6 +1,9 @@
 use crate::{
     core::{error::AppError, middleware::auth::AuthUser, validation::ValidatedJson},
-    domain::auth::dto::{AuthResponseDto, LoginDto, RefreshTokenDto, RegisterDto},
+    domain::{
+        auth::dto::{AuthResponseDto, LoginDto, RefreshTokenDto, RegisterDto},
+        users::dto::user_response_dto::UserResponseDto,
+    },
     shared::app_state::AppState,
 };
 use axum::{
@@ -18,7 +21,18 @@ pub fn auth_routes() -> Router<Arc<AppState>> {
         .route("/profile", get(get_profile))
 }
 
-async fn get_profile(
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth/profile",
+    responses(
+        (status = 200, description = "Get current user profile", body = UserResponseDto),
+        (status = 401, description = "Unauthorized")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn get_profile(
     auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<crate::domain::users::dto::UserResponseDto>, AppError> {
@@ -26,7 +40,16 @@ async fn get_profile(
     Ok(Json(res))
 }
 
-async fn login(
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/login",
+    request_body = LoginDto,
+    responses(
+        (status = 200, description = "Login successful", body = AuthResponseDto),
+        (status = 401, description = "Invalid credentials")
+    )
+)]
+pub async fn login(
     State(state): State<Arc<AppState>>,
     ValidatedJson(req): ValidatedJson<LoginDto>,
 ) -> Result<Json<AuthResponseDto>, AppError> {
@@ -34,7 +57,16 @@ async fn login(
     Ok(Json(res))
 }
 
-async fn register(
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/register",
+    request_body = RegisterDto,
+    responses(
+        (status = 201, description = "User registered successfully", body = AuthResponseDto),
+        (status = 400, description = "Bad request")
+    )
+)]
+pub async fn register(
     State(state): State<Arc<AppState>>,
     ValidatedJson(req): ValidatedJson<RegisterDto>,
 ) -> Result<Json<AuthResponseDto>, AppError> {
@@ -42,7 +74,16 @@ async fn register(
     Ok(Json(res))
 }
 
-async fn refresh_token(
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/refresh",
+    request_body = RefreshTokenDto,
+    responses(
+        (status = 200, description = "Token refreshed successfully", body = AuthResponseDto),
+        (status = 401, description = "Invalid refresh token")
+    )
+)]
+pub async fn refresh_token(
     State(state): State<Arc<AppState>>,
     ValidatedJson(req): ValidatedJson<RefreshTokenDto>,
 ) -> Result<Json<AuthResponseDto>, AppError> {

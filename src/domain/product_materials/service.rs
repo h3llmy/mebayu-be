@@ -62,7 +62,7 @@ impl<R: ProductMaterialRepository> ProductMaterialServiceImpl<R> {
     ) -> Result<ProductMaterial, AppError> {
         let material = ProductMaterial {
             id: Uuid::new_v4(),
-            name: req.name.unwrap(),
+            name: req.name,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         };

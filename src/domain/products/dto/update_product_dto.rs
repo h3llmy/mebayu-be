@@ -1,8 +1,9 @@
 use serde::Deserialize;
+use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
-#[derive(Deserialize, Validate, Debug)]
+#[derive(Deserialize, Validate, Debug, ToSchema)]
 pub struct UpdateProductRequest {
     #[validate(length(min = 1))]
     pub category_ids: Option<Vec<Uuid>>,

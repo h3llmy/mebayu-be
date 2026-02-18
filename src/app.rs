@@ -5,6 +5,7 @@ use metrics_exporter_prometheus::PrometheusBuilder;
 use sqlx::PgPool;
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
+use utoipa::OpenApi;
 
 use crate::{
     core::{
@@ -85,6 +86,10 @@ pub async fn build_app(pool: PgPool, config: Config) -> Router {
         .route(
             "/metrics",
             get(move || std::future::ready(recorder_handle.render())),
+        )
+        .merge(
+            utoipa_swagger_ui::SwaggerUi::new("/swagger-ui")
+                .url("/api-docs/openapi.json", openapi::ApiDoc::openapi()),
         )
         .nest("/api/v1", api_v1_router)
         .fallback(not_found)

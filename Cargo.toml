@@ -25,3 +25,6 @@ metrics = "0.24.3"
 metrics-exporter-prometheus = "0.18.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
 tracing = "0.1"
+utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
+utoipa-axum = "0.2.0"
+utoipa = { version = "5.3.1", features = ["uuid", "chrono"] }

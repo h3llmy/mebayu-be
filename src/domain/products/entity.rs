@@ -1,12 +1,13 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::domain::product_categories::entity::ProductCategory;
 use crate::domain::product_materials::entity::ProductMaterial;
 
-#[derive(Clone, Serialize, Deserialize, FromRow)]
+#[derive(Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct Product {
     pub id: Uuid,
     pub name: String,
@@ -33,7 +34,7 @@ pub struct Product {
     pub images: Vec<ProductImage>,
 }
 
-#[derive(Clone, Serialize, Deserialize, FromRow, Debug)]
+#[derive(Clone, Serialize, Deserialize, FromRow, Debug, ToSchema)]
 pub struct ProductImage {
     pub id: Uuid,
     pub product_id: Uuid,

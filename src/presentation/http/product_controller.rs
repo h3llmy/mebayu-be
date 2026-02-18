@@ -31,7 +31,17 @@ pub fn product_routes() -> Router<Arc<AppState>> {
         .route("/{id}", get(get_by_id).put(update).delete(delete))
 }
 
-async fn get_all(
+#[utoipa::path(
+    get,
+    path = "/api/v1/products",
+    params(
+        PaginationQuery
+    ),
+    responses(
+        (status = 200, description = "List all products", body = PaginationResponse<Vec<Product>>),
+    )
+)]
+pub async fn get_all(
     State(state): State<Arc<AppState>>,
     ValidatedQuery(query): ValidatedQuery<PaginationQuery>,
 ) -> Result<Json<PaginationResponse<Vec<Product>>>, AppError> {
@@ -39,7 +49,21 @@ async fn get_all(
     Ok(Json(response))
 }
 
-async fn create(
+#[utoipa::path(
+    post,
+    path = "/api/v1/products",
+    request_body = CreateProductRequest,
+    responses(
+        (status = 201, description = "Product created successfully", body = ApiResponse<Product>),
+        (status = 400, description = "Bad Request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn create(
     // auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
     ValidatedJson(req): ValidatedJson<CreateProductRequest>,
@@ -49,7 +73,18 @@ async fn create(
     Ok(Json(ApiResponse { data: product }))
 }
 
-async fn get_by_id(
+#[utoipa::path(
+    get,
+    path = "/api/v1/products/{id}",
+    responses(
+        (status = 200, description = "Get product by ID", body = ApiResponse<Product>),
+        (status = 404, description = "Product not found")
+    ),
+    params(
+        ("id" = Uuid, Path, description = "Product ID")
+    )
+)]
+pub async fn get_by_id(
     State(state): State<Arc<AppState>>,
     id: Path<Uuid>,
 ) -> Result<Json<ApiResponse<Product>>, AppError> {
@@ -57,7 +92,25 @@ async fn get_by_id(
     Ok(Json(ApiResponse { data: product }))
 }
 
-async fn update(
+#[utoipa::path(
+    put,
+    path = "/api/v1/products/{id}",
+    request_body = UpdateProductRequest,
+    responses(
+        (status = 200, description = "Product updated successfully", body = ApiResponse<Product>),
+        (status = 400, description = "Bad Request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Product not found")
+    ),
+    params(
+        ("id" = Uuid, Path, description = "Product ID")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn update(
     auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
     id: Path<Uuid>,
@@ -68,7 +121,23 @@ async fn update(
     Ok(Json(ApiResponse { data: product }))
 }
 
-async fn delete(
+#[utoipa::path(
+    delete,
+    path = "/api/v1/products/{id}",
+    responses(
+        (status = 200, description = "Product deleted successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Product not found")
+    ),
+    params(
+        ("id" = Uuid, Path, description = "Product ID")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn delete(
     auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
     id: Path<Uuid>,

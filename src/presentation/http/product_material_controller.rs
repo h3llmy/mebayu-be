@@ -31,7 +31,17 @@ pub fn product_material_routes() -> Router<Arc<AppState>> {
         .route("/{id}", get(get_by_id).put(update).delete(delete))
 }
 
-async fn get_all(
+#[utoipa::path(
+    get,
+    path = "/api/v1/product-materials",
+    params(
+        PaginationQuery
+    ),
+    responses(
+        (status = 200, description = "List all product materials", body = PaginationResponse<Vec<ProductMaterial>>),
+    )
+)]
+pub async fn get_all(
     State(state): State<Arc<AppState>>,
     ValidatedQuery(query): ValidatedQuery<PaginationQuery>,
 ) -> Result<Json<PaginationResponse<Vec<ProductMaterial>>>, AppError> {
@@ -39,7 +49,21 @@ async fn get_all(
     Ok(Json(response))
 }
 
-async fn create(
+#[utoipa::path(
+    post,
+    path = "/api/v1/product-materials",
+    request_body = CreateProductMaterialRequest,
+    responses(
+        (status = 201, description = "Product material created successfully", body = ApiResponse<ProductMaterial>),
+        (status = 400, description = "Bad Request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn create(
     // auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
     ValidatedJson(payload): ValidatedJson<CreateProductMaterialRequest>,
@@ -49,7 +73,18 @@ async fn create(
     Ok(Json(ApiResponse { data: material }))
 }
 
-async fn get_by_id(
+#[utoipa::path(
+    get,
+    path = "/api/v1/product-materials/{id}",
+    responses(
+        (status = 200, description = "Get product material by ID", body = ApiResponse<ProductMaterial>),
+        (status = 404, description = "Product material not found")
+    ),
+    params(
+        ("id" = Uuid, Path, description = "Product Material ID")
+    )
+)]
+pub async fn get_by_id(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<ProductMaterial>>, AppError> {
@@ -57,7 +92,25 @@ async fn get_by_id(
     Ok(Json(ApiResponse { data: material }))
 }
 
-async fn update(
+#[utoipa::path(
+    put,
+    path = "/api/v1/product-materials/{id}",
+    request_body = UpdateProductMaterialRequest,
+    responses(
+        (status = 200, description = "Product material updated successfully", body = ApiResponse<ProductMaterial>),
+        (status = 400, description = "Bad Request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Product material not found")
+    ),
+    params(
+        ("id" = Uuid, Path, description = "Product Material ID")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn update(
     auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
@@ -68,7 +121,23 @@ async fn update(
     Ok(Json(ApiResponse { data: material }))
 }
 
-async fn delete(
+#[utoipa::path(
+    delete,
+    path = "/api/v1/product-materials/{id}",
+    responses(
+        (status = 200, description = "Product material deleted successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Product material not found")
+    ),
+    params(
+        ("id" = Uuid, Path, description = "Product Material ID")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn delete(
     auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,

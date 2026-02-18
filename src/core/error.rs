@@ -5,6 +5,7 @@ use axum::{
 };
 use serde::Serialize;
 use std::collections::HashMap;
+use utoipa::ToSchema;
 
 #[derive(Debug)]
 pub enum AppError {
@@ -17,7 +18,7 @@ pub enum AppError {
     Internal(String),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 struct ErrorResponse {
     message: String,
     #[serde(skip_serializing_if = "Option::is_none")]

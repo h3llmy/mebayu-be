@@ -1,38 +1,31 @@
 use serde::Deserialize;
+use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
-#[derive(Deserialize, Validate, Debug)]
+#[derive(Deserialize, Validate, Debug, ToSchema)]
 pub struct CreateProductRequest {
-    #[validate(required)]
     #[validate(length(min = 1))]
-    pub category_ids: Option<Vec<Uuid>>,
+    pub category_ids: Vec<Uuid>,
 
-    #[validate(required)]
     #[validate(length(min = 1))]
-    pub material_ids: Option<Vec<Uuid>>,
+    pub material_ids: Vec<Uuid>,
 
-    #[validate(required)]
     #[validate(length(min = 1))]
-    pub name: Option<String>,
+    pub name: String,
 
-    #[validate(required)]
     #[validate(length(min = 1))]
-    pub material: Option<String>,
+    pub material: String,
 
-    #[validate(required)]
     #[validate(range(min = 0.01))]
-    pub price: Option<f64>,
+    pub price: f64,
 
-    #[validate(required)]
     #[validate(length(min = 1))]
-    pub description: Option<String>,
+    pub description: String,
 
-    #[validate(required)]
     #[validate(length(min = 1))]
-    pub status: Option<String>,
+    pub status: String,
 
-    #[validate(required)]
     #[validate(length(min = 1))]
-    pub image_urls: Option<Vec<String>>,
+    pub image_urls: Vec<String>,
 }
