@@ -17,7 +17,7 @@ pub async fn rate_limiter_middleware(
         .redis_client
         .get_multiplexed_async_connection()
         .await
-        .map_err(|_| {
+        .map_err(|e| {
             tracing::error!("Redis error: {}", e);
             AppError::Database("Redis error".to_string())
         })?;
