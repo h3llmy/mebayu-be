@@ -1,7 +1,7 @@
 use crate::{core::error::AppError, shared::app_state::AppState};
 use axum::{
     extract::{ConnectInfo, State},
-    http::{Request, StatusCode},
+    http::Request,
     middleware::Next,
     response::Response,
 };
