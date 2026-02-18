@@ -16,7 +16,9 @@ async fn main() {
     let config = Config::from_env();
     Config::logger_setup();
 
-    let pool = create_pool(&config.database_url).await;
+    let pool = create_pool(&config.database_url)
+        .await
+        .expect("Database initialization failed");
     run_migrations(&pool).await;
 
     let app = app::build_app(pool, config.clone()).await;
