@@ -22,5 +22,6 @@ pub struct AppState {
     pub user_service: Arc<UserServiceImpl<UserRepositoryImpl>>,
     pub auth_service: Arc<AuthService<UserRepositoryImpl>>,
     pub redis_client: redis::Client,
+    pub s3_client: aws_sdk_s3::Client,
     pub config: Config,
 }

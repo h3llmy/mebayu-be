@@ -10,6 +10,12 @@ pub struct Config {
     pub rate_limit_requests: u64,
     pub rate_limit_window: u64,
     pub jwt_secret: String,
+    pub s3_endpoint: String,
+    pub s3_region: String,
+    pub s3_bucket: String,
+    pub s3_access_key: String,
+    pub s3_secret_key: String,
+    pub s3_public_url: String,
 }
 
 impl Config {
@@ -31,6 +37,15 @@ impl Config {
                 .parse()
                 .unwrap_or(60),
             jwt_secret: env::var("JWT_SECRET").unwrap_or_else(|_| "default_secret".to_string()),
+
+            s3_endpoint: env::var("S3_ENDPOINT")
+                .unwrap_or_else(|_| "http://localhost:9000".to_string()),
+            s3_region: env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string()),
+            s3_bucket: env::var("S3_BUCKET").expect("S3_BUCKET must be set"),
+            s3_access_key: env::var("S3_ACCESS_KEY").expect("S3_ACCESS_KEY must be set"),
+            s3_secret_key: env::var("S3_SECRET_KEY").expect("S3_SECRET_KEY must be set"),
+            s3_public_url: env::var("S3_PUBLIC_URL")
+                .unwrap_or_else(|_| "http://localhost:9000".to_string()),
         }
     }
 
