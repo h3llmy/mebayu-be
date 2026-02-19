@@ -20,6 +20,7 @@ use crate::{
     },
     infrastructure::{
         database::redis::create_redis_client,
+        object_storage::s3::S3Service,
         repository::{
             product_category_repository_impl::ProductCategoryRepositoryImpl,
             product_material_repository_impl::ProductMaterialRepositoryImpl,
@@ -42,7 +43,6 @@ async fn health_check() -> Result<String, AppError> {
 pub async fn build_app(pool: PgPool, config: Config) -> Router {
     let redis_client = create_redis_client(&config.redis_url);
 
-    let s3_client = crate::infrastructure::object_storage::s3::create_s3_client(&config).await;
     let product_repo = Arc::new(ProductRepositoryImpl::new(pool.clone()));
     let category_repo = Arc::new(ProductCategoryRepositoryImpl::new(pool.clone()));
     let material_repo = Arc::new(ProductMaterialRepositoryImpl::new(pool.clone()));
@@ -56,6 +56,7 @@ pub async fn build_app(pool: PgPool, config: Config) -> Router {
         user_service.clone(),
         config.jwt_secret.clone(),
     ));
+    let s3_service = Arc::new(S3Service::new(&config).await);
 
     let state = Arc::new(AppState {
         product_service,
@@ -64,7 +65,7 @@ pub async fn build_app(pool: PgPool, config: Config) -> Router {
         user_service,
         auth_service,
         redis_client,
-        s3_client,
+        s3_service,
         config: config.clone(),
     });
 

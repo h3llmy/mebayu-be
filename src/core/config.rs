@@ -15,7 +15,6 @@ pub struct Config {
     pub s3_bucket: String,
     pub s3_access_key: String,
     pub s3_secret_key: String,
-    pub s3_public_url: String,
 }
 
 impl Config {
@@ -44,8 +43,6 @@ impl Config {
             s3_bucket: env::var("S3_BUCKET").expect("S3_BUCKET must be set"),
             s3_access_key: env::var("S3_ACCESS_KEY").expect("S3_ACCESS_KEY must be set"),
             s3_secret_key: env::var("S3_SECRET_KEY").expect("S3_SECRET_KEY must be set"),
-            s3_public_url: env::var("S3_PUBLIC_URL")
-                .unwrap_or_else(|_| "http://localhost:9000".to_string()),
         }
     }
 

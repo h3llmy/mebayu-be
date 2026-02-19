@@ -7,10 +7,14 @@ use crate::{
         product_materials::service::ProductMaterialServiceImpl,
         products::service::ProductServiceImpl, users::service::UserServiceImpl,
     },
-    infrastructure::repository::{
-        product_category_repository_impl::ProductCategoryRepositoryImpl,
-        product_material_repository_impl::ProductMaterialRepositoryImpl,
-        product_repository_impl::ProductRepositoryImpl, user_repository_impl::UserRepositoryImpl,
+    infrastructure::{
+        object_storage::s3::S3Service,
+        repository::{
+            product_category_repository_impl::ProductCategoryRepositoryImpl,
+            product_material_repository_impl::ProductMaterialRepositoryImpl,
+            product_repository_impl::ProductRepositoryImpl,
+            user_repository_impl::UserRepositoryImpl,
+        },
     },
 };
 
@@ -22,6 +26,6 @@ pub struct AppState {
     pub user_service: Arc<UserServiceImpl<UserRepositoryImpl>>,
     pub auth_service: Arc<AuthService<UserRepositoryImpl>>,
     pub redis_client: redis::Client,
-    pub s3_client: aws_sdk_s3::Client,
+    pub s3_service: Arc<S3Service>,
     pub config: Config,
 }

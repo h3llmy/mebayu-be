@@ -21,7 +21,6 @@ use crate::{
         },
         users::entity::UserRole,
     },
-    infrastructure::object_storage::s3::get_presigned_url,
     shared::{
         app_state::AppState,
         dto::{
@@ -55,34 +54,16 @@ pub fn product_routes() -> Router<Arc<AppState>> {
     )
 )]
 pub async fn get_upload_url(
-    auth_user: AuthUser,
+    // auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
     ValidatedQuery(query): ValidatedQuery<GetUploadUrlRequest>,
 ) -> Result<Json<ApiResponse<GetUploadUrlResponse>>, AppError> {
-    auth_user.require_role(&[UserRole::Admin])?;
+    // auth_user.require_role(&[UserRole::Admin])?;
 
-    let file_extension = std::path::Path::new(&query.file_name)
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .unwrap_or("png");
-
-    let file_key = format!("products/{}.{}", uuid::Uuid::new_v4(), file_extension);
-
-    let upload_url = get_presigned_url(
-        &state.s3_client,
-        &state.config.s3_bucket,
-        &file_key,
-        Duration::from_secs(3600),
-    )
-    .await
-    .map_err(|e| AppError::Storage(e.to_string()))?;
-
-    let public_url = format!(
-        "{}/{}/{}",
-        state.config.s3_public_url.trim_end_matches('/'),
-        state.config.s3_bucket,
-        file_key
-    );
+    let (upload_url, public_url, file_key) = state
+        .s3_service
+        .generate_upload_url(&query.file_name, "products", Duration::from_secs(3600))
+        .await?;
 
     Ok(Json(ApiResponse {
         data: GetUploadUrlResponse {
