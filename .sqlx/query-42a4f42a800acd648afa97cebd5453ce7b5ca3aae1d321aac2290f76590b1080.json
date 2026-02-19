@@ -1,0 +1,82 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            p.*,\n\n            COALESCE(\n                json_agg(DISTINCT pc) \n                FILTER (WHERE pc.id IS NOT NULL),\n                '[]'\n            ) as \"categories!: serde_json::Value\",\n\n            COALESCE(\n                json_agg(DISTINCT pm) \n                FILTER (WHERE pm.id IS NOT NULL),\n                '[]'\n            ) as \"product_materials!: serde_json::Value\",\n\n            COALESCE(\n                json_agg(DISTINCT pi) \n                FILTER (WHERE pi.id IS NOT NULL),\n                '[]'\n            ) as \"images!: serde_json::Value\"\n\n        FROM products p\n\n        LEFT JOIN product_category_relations pcr \n            ON p.id = pcr.product_id\n        LEFT JOIN product_categories pc \n            ON pcr.category_id = pc.id\n\n        LEFT JOIN product_material_relations pmr \n            ON p.id = pmr.product_id\n        LEFT JOIN product_materials pm \n            ON pmr.material_id = pm.id\n\n        LEFT JOIN product_images pi \n            ON p.id = pi.product_id\n\n        WHERE p.id = $1\n        GROUP BY p.id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "material",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "price",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 4,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "categories!: serde_json::Value",
+        "type_info": "Json"
+      },
+      {
+        "ordinal": 9,
+        "name": "product_materials!: serde_json::Value",
+        "type_info": "Json"
+      },
+      {
+        "ordinal": 10,
+        "name": "images!: serde_json::Value",
+        "type_info": "Json"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "42a4f42a800acd648afa97cebd5453ce7b5ca3aae1d321aac2290f76590b1080"
+}

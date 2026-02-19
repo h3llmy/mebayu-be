@@ -148,61 +148,71 @@ impl ProductRepository for ProductRepositoryImpl {
     }
 
     async fn find_by_id(&self, id: Uuid) -> Result<Product, AppError> {
-        let product_row = sqlx::query!("SELECT * FROM products WHERE id = $1", id)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?
-            .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
-
-        let categories = sqlx::query_as!(
-            ProductCategory,
+        let row = sqlx::query!(
             r#"
-            SELECT pc.* 
-            FROM product_category_relations pcr
-            JOIN product_categories pc ON pcr.category_id = pc.id
-            WHERE pcr.product_id = $1
-            "#,
+        SELECT 
+            p.*,
+
+            COALESCE(
+                json_agg(DISTINCT pc) 
+                FILTER (WHERE pc.id IS NOT NULL),
+                '[]'
+            ) as "categories!: serde_json::Value",
+
+            COALESCE(
+                json_agg(DISTINCT pm) 
+                FILTER (WHERE pm.id IS NOT NULL),
+                '[]'
+            ) as "product_materials!: serde_json::Value",
+
+            COALESCE(
+                json_agg(DISTINCT pi) 
+                FILTER (WHERE pi.id IS NOT NULL),
+                '[]'
+            ) as "images!: serde_json::Value"
+
+        FROM products p
+
+        LEFT JOIN product_category_relations pcr 
+            ON p.id = pcr.product_id
+        LEFT JOIN product_categories pc 
+            ON pcr.category_id = pc.id
+
+        LEFT JOIN product_material_relations pmr 
+            ON p.id = pmr.product_id
+        LEFT JOIN product_materials pm 
+            ON pmr.material_id = pm.id
+
+        LEFT JOIN product_images pi 
+            ON p.id = pi.product_id
+
+        WHERE p.id = $1
+        GROUP BY p.id
+        "#,
             id
         )
-        .fetch_all(&self.pool)
+        .fetch_optional(&self.pool)
         .await
-        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+        .map_err(|e| AppError::Database(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
 
-        let product_materials = sqlx::query_as!(
-            ProductMaterial,
-            r#"
-            SELECT pm.*
-            FROM product_material_relations pmr
-            JOIN product_materials pm ON pmr.material_id = pm.id
-            WHERE pmr.product_id = $1
-            "#,
-            id
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+        let categories: Vec<ProductCategory> =
+            serde_json::from_value(row.categories).unwrap_or_default();
 
-        let images = sqlx::query_as::<_, ProductImage>(
-            r#"
-            SELECT *
-            FROM product_images
-            WHERE product_id = $1
-            "#,
-        )
-        .bind(id)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+        let product_materials: Vec<ProductMaterial> =
+            serde_json::from_value(row.product_materials).unwrap_or_default();
+
+        let images: Vec<ProductImage> = serde_json::from_value(row.images).unwrap_or_default();
 
         Ok(Product {
-            id: product_row.id,
-            name: product_row.name,
-            material: product_row.material,
-            price: product_row.price,
-            description: product_row.description,
-            status: product_row.status,
-            created_at: product_row.created_at,
-            updated_at: product_row.updated_at,
+            id: row.id,
+            name: row.name,
+            material: row.material,
+            price: row.price,
+            description: row.description,
+            status: row.status,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
             category_ids: categories.iter().map(|c| c.id).collect(),
             material_ids: product_materials.iter().map(|m| m.id).collect(),
             categories,
