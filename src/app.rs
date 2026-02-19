@@ -4,7 +4,7 @@ use axum::{Router, middleware, routing::get};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use sqlx::PgPool;
 use tower::ServiceBuilder;
-use tower_http::trace::TraceLayer;
+use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 use utoipa::OpenApi;
 
 use crate::{
@@ -97,6 +97,13 @@ pub async fn build_app(pool: PgPool, config: Config) -> Router {
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
                 .layer(middleware::from_fn(metrics::track_metrics)),
+        )
+        .layer(
+            CompressionLayer::new()
+                .gzip(true)
+                .br(true)
+                .deflate(true)
+                .zstd(true),
         )
         .with_state(state)
 }
