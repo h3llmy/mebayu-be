@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use sqlx::{PgPool, Postgres, QueryBuilder, Row};
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 use crate::{
@@ -33,33 +33,9 @@ impl ProductRepository for ProductRepositoryImpl {
         let limit = query.get_limit() as i64;
         let offset = query.get_offset();
 
-        let mut qb = QueryBuilder::<Postgres>::new(
-            r#"
-        SELECT 
-            p.*,
-            COUNT(*) OVER() as total_count
-        FROM products p
-        "#,
-        );
+        let search = query.get_search().map(|s| format!("%{}%", s));
 
-        // -------------------------
-        // SEARCH
-        // -------------------------
-        if let Some(search) = query.get_search() {
-            qb.push(" WHERE (");
-            qb.push("p.name ILIKE ");
-            qb.push_bind(format!("%{}%", search));
-            qb.push(" OR p.material ILIKE ");
-            qb.push_bind(format!("%{}%", search));
-            qb.push(" OR p.description ILIKE ");
-            qb.push_bind(format!("%{}%", search));
-            qb.push(")");
-        }
-
-        // -------------------------
-        // SORT (whitelisted fields)
-        // -------------------------
-        let allowed_sort_fields = vec!["name", "price", "created_at", "updated_at", "status"];
+        let allowed_sort_fields = ["name", "price", "created_at", "updated_at", "status"];
 
         let sort_field = query
             .get_sort()
@@ -71,114 +47,87 @@ impl ProductRepository for ProductRepositoryImpl {
             _ => "DESC",
         };
 
-        qb.push(" ORDER BY p.");
-        qb.push(sort_field);
-        qb.push(" ");
-        qb.push(sort_order);
+        let rows = sqlx::query(&format!(
+            r#"
+            SELECT
+                p.*,
+                COUNT(*) OVER() as total_count,
 
-        // -------------------------
-        // PAGINATION
-        // -------------------------
-        qb.push(" LIMIT ");
-        qb.push_bind(limit);
-        qb.push(" OFFSET ");
-        qb.push_bind(offset);
+                COALESCE(
+                    JSON_AGG(DISTINCT pc.*)
+                    FILTER (WHERE pc.id IS NOT NULL),
+                    '[]'
+                ) as categories,
 
-        let rows = qb
-            .build()
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+                COALESCE(
+                    JSON_AGG(DISTINCT pm.*)
+                    FILTER (WHERE pm.id IS NOT NULL),
+                    '[]'
+                ) as materials,
+
+                COALESCE(
+                    JSON_AGG(DISTINCT pi.*)
+                    FILTER (WHERE pi.id IS NOT NULL),
+                    '[]'
+                ) as images
+
+            FROM products p
+
+            LEFT JOIN product_category_relations pcr
+                ON p.id = pcr.product_id
+            LEFT JOIN product_categories pc
+                ON pcr.category_id = pc.id
+
+            LEFT JOIN product_material_relations pmr
+                ON p.id = pmr.product_id
+            LEFT JOIN product_materials pm
+                ON pmr.material_id = pm.id
+
+            LEFT JOIN product_images pi
+                ON p.id = pi.product_id
+
+            {}
+            GROUP BY p.id
+            ORDER BY p.{} {}
+            LIMIT $1 OFFSET $2
+            "#,
+            if search.is_some() {
+                "WHERE p.name ILIKE $3
+                   OR p.material ILIKE $3
+                   OR p.description ILIKE $3"
+            } else {
+                ""
+            },
+            sort_field,
+            sort_order
+        ))
+        .bind(limit)
+        .bind(offset)
+        .bind(search)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
         if rows.is_empty() {
             return Ok((vec![], 0));
         }
 
         let total = rows[0].get::<i64, _>("total_count") as u64;
-        let product_ids: Vec<Uuid> = rows.iter().map(|r| r.get("id")).collect();
-
-        // Fetch categories for all products
-        let categories_rows = sqlx::query!(
-            r#"
-            SELECT pcr.product_id, pc.* 
-            FROM product_category_relations pcr
-            JOIN product_categories pc ON pcr.category_id = pc.id
-            WHERE pcr.product_id = ANY($1)
-            "#,
-            &product_ids
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
-
-        // Fetch materials for all products
-        let materials_rows = sqlx::query!(
-            r#"
-            SELECT pmr.product_id, pm.*
-            FROM product_material_relations pmr
-            JOIN product_materials pm ON pmr.material_id = pm.id
-            WHERE pmr.product_id = ANY($1)
-            "#,
-            &product_ids
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
-
-        // Fetch images for all products
-        let images_rows = sqlx::query(
-            r#"
-            SELECT *
-            FROM product_images
-            WHERE product_id = ANY($1)
-            "#,
-        )
-        .bind(&product_ids)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         let products = rows
             .into_iter()
             .map(|r| {
-                let id: Uuid = r.get("id");
+                let categories: Vec<ProductCategory> =
+                    serde_json::from_value(r.get("categories")).unwrap_or_default();
 
-                let categories: Vec<ProductCategory> = categories_rows
-                    .iter()
-                    .filter(|cr| cr.product_id == id)
-                    .map(|cr| ProductCategory {
-                        id: cr.id,
-                        name: cr.name.clone(),
-                        created_at: cr.created_at,
-                        updated_at: cr.updated_at,
-                    })
-                    .collect();
+                let materials: Vec<ProductMaterial> =
+                    serde_json::from_value(r.get("materials")).unwrap_or_default();
 
-                let product_materials: Vec<ProductMaterial> = materials_rows
-                    .iter()
-                    .filter(|mr| mr.product_id == id)
-                    .map(|mr| ProductMaterial {
-                        id: mr.id,
-                        name: mr.name.clone(),
-                        created_at: mr.created_at,
-                        updated_at: mr.updated_at,
-                    })
-                    .collect();
-
-                let images: Vec<ProductImage> = images_rows
-                    .iter()
-                    .filter(|ir| ir.get::<Uuid, _>("product_id") == id)
-                    .map(|ir| ProductImage {
-                        id: ir.get("id"),
-                        product_id: ir.get("product_id"),
-                        url: ir.get("url"),
-                        created_at: ir.get("created_at"),
-                        updated_at: ir.get("updated_at"),
-                    })
-                    .collect();
+                let images: Vec<ProductImage> =
+                    serde_json::from_value(r.get("images")).unwrap_or_default();
 
                 Product {
-                    id,
+                    id: r.get("id"),
                     name: r.get("name"),
                     material: r.get("material"),
                     price: r.get("price"),
@@ -187,9 +136,9 @@ impl ProductRepository for ProductRepositoryImpl {
                     created_at: r.get("created_at"),
                     updated_at: r.get("updated_at"),
                     category_ids: categories.iter().map(|c| c.id).collect(),
-                    material_ids: product_materials.iter().map(|m| m.id).collect(),
+                    material_ids: materials.iter().map(|m| m.id).collect(),
                     categories,
-                    product_materials,
+                    product_materials: materials,
                     images,
                 }
             })

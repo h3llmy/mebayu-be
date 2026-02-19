@@ -20,12 +20,20 @@ pub struct AuthUser {
 }
 
 impl AuthUser {
-    pub fn require_admin(&self) -> Result<(), AppError> {
-        if self.role == UserRole::Admin {
+    pub fn require_role(&self, role: &[UserRole]) -> Result<(), AppError> {
+        if role.contains(&self.role) {
             Ok(())
         } else {
-            Err(AppError::Forbidden("Admin access required".to_string()))
+            Err(AppError::Forbidden(format!(
+                "Access Denied {:?} role required",
+                role
+            )))
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn require_permission(&self, _permission: &str) -> Result<(), AppError> {
+        unimplemented!("Permission check not implemented yet")
     }
 }
 

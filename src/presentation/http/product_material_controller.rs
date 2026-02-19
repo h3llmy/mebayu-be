@@ -12,9 +12,12 @@ use crate::{
         middleware::auth::AuthUser,
         validation::{ValidatedJson, ValidatedQuery},
     },
-    domain::product_materials::{
-        dto::{CreateProductMaterialRequest, UpdateProductMaterialRequest},
-        entity::ProductMaterial,
+    domain::{
+        product_materials::{
+            dto::{CreateProductMaterialRequest, UpdateProductMaterialRequest},
+            entity::ProductMaterial,
+        },
+        users::entity::UserRole,
     },
     shared::{
         app_state::AppState,
@@ -33,6 +36,7 @@ pub fn product_material_routes() -> Router<Arc<AppState>> {
 
 #[utoipa::path(
     get,
+    operation_id = "list_product_materials",
     path = "/api/v1/product-materials",
     params(
         PaginationQuery
@@ -51,6 +55,7 @@ pub async fn get_all(
 
 #[utoipa::path(
     post,
+    operation_id = "create_product_material",
     path = "/api/v1/product-materials",
     request_body = CreateProductMaterialRequest,
     responses(
@@ -75,6 +80,7 @@ pub async fn create(
 
 #[utoipa::path(
     get,
+    operation_id = "get_product_material_by_id",
     path = "/api/v1/product-materials/{id}",
     responses(
         (status = 200, description = "Get product material by ID", body = ApiResponse<ProductMaterial>),
@@ -94,6 +100,7 @@ pub async fn get_by_id(
 
 #[utoipa::path(
     put,
+    operation_id = "update_product_material",
     path = "/api/v1/product-materials/{id}",
     request_body = UpdateProductMaterialRequest,
     responses(
@@ -116,13 +123,14 @@ pub async fn update(
     Path(id): Path<Uuid>,
     ValidatedJson(payload): ValidatedJson<UpdateProductMaterialRequest>,
 ) -> Result<Json<ApiResponse<ProductMaterial>>, AppError> {
-    auth_user.require_admin()?;
+    auth_user.require_role(&[UserRole::Admin])?;
     let material = state.product_material_service.update(id, payload).await?;
     Ok(Json(ApiResponse { data: material }))
 }
 
 #[utoipa::path(
     delete,
+    operation_id = "delete_product_material",
     path = "/api/v1/product-materials/{id}",
     responses(
         (status = 200, description = "Product material deleted successfully"),
@@ -142,7 +150,7 @@ pub async fn delete(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<()>>, AppError> {
-    auth_user.require_admin()?;
+    auth_user.require_role(&[UserRole::Admin])?;
     state.product_material_service.delete(id).await?;
     Ok(Json(ApiResponse { data: () }))
 }

@@ -27,6 +27,7 @@ pub fn auth_routes() -> Router<Arc<AppState>> {
 
 #[utoipa::path(
     get,
+    operation_id = "get_auth_profile",
     path = "/api/v1/auth/profile",
     responses(
         (status = 200, description = "Get current user profile", body = UserResponseDto),
@@ -46,6 +47,7 @@ pub async fn get_profile(
 
 #[utoipa::path(
     post,
+    operation_id = "auth_login",
     path = "/api/v1/auth/login",
     request_body = LoginDto,
     responses(
@@ -63,6 +65,7 @@ pub async fn login(
 
 #[utoipa::path(
     post,
+    operation_id = "auth_register",
     path = "/api/v1/auth/register",
     request_body = RegisterDto,
     responses(
@@ -80,6 +83,7 @@ pub async fn register(
 
 #[utoipa::path(
     post,
+    operation_id = "auth_refresh_token",
     path = "/api/v1/auth/refresh",
     request_body = RefreshTokenDto,
     responses(

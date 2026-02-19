@@ -13,7 +13,7 @@ use utoipa::{
 
 #[derive(OpenApi)]
 #[openapi(
-    info(title = "Mebayu API", version = "1.0.0", description = "Mebayu API Documentation"),
+    info(title = "Mebayu API", version = "1.0.0", description = "Mebayu API Documentation", license(name = "MIT")),
     paths(
         auth_controller::get_profile,
         auth_controller::login,

@@ -11,9 +11,12 @@ use crate::{
         middleware::auth::AuthUser,
         validation::{ValidatedJson, ValidatedQuery},
     },
-    domain::products::{
-        dto::{CreateProductRequest, UpdateProductRequest},
-        entity::Product,
+    domain::{
+        products::{
+            dto::{CreateProductRequest, UpdateProductRequest},
+            entity::Product,
+        },
+        users::entity::UserRole,
     },
     shared::{
         app_state::AppState,
@@ -33,6 +36,7 @@ pub fn product_routes() -> Router<Arc<AppState>> {
 
 #[utoipa::path(
     get,
+    operation_id = "list_products",
     path = "/api/v1/products",
     params(
         PaginationQuery
@@ -51,6 +55,7 @@ pub async fn get_all(
 
 #[utoipa::path(
     post,
+    operation_id = "create_product",
     path = "/api/v1/products",
     request_body = CreateProductRequest,
     responses(
@@ -75,6 +80,7 @@ pub async fn create(
 
 #[utoipa::path(
     get,
+    operation_id = "get_product_by_id",
     path = "/api/v1/products/{id}",
     responses(
         (status = 200, description = "Get product by ID", body = ApiResponse<Product>),
@@ -94,6 +100,7 @@ pub async fn get_by_id(
 
 #[utoipa::path(
     put,
+    operation_id = "update_product",
     path = "/api/v1/products/{id}",
     request_body = UpdateProductRequest,
     responses(
@@ -116,13 +123,14 @@ pub async fn update(
     id: Path<Uuid>,
     ValidatedJson(payload): ValidatedJson<UpdateProductRequest>,
 ) -> Result<Json<ApiResponse<Product>>, AppError> {
-    auth_user.require_admin()?;
+    auth_user.require_role(&[UserRole::Admin])?;
     let product = state.product_service.update(*id, payload).await?;
     Ok(Json(ApiResponse { data: product }))
 }
 
 #[utoipa::path(
     delete,
+    operation_id = "delete_product",
     path = "/api/v1/products/{id}",
     responses(
         (status = 200, description = "Product deleted successfully"),
@@ -142,7 +150,7 @@ pub async fn delete(
     State(state): State<Arc<AppState>>,
     id: Path<Uuid>,
 ) -> Result<Json<ApiResponse<()>>, AppError> {
-    auth_user.require_admin()?;
+    auth_user.require_role(&[UserRole::Admin])?;
     state.product_service.delete(*id).await?;
     Ok(Json(ApiResponse { data: () }))
 }

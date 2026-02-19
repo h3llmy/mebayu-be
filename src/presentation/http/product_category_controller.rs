@@ -11,9 +11,12 @@ use crate::{
         middleware::auth::AuthUser,
         validation::{ValidatedJson, ValidatedQuery},
     },
-    domain::product_categories::{
-        dto::{CreateProductCategoryRequest, UpdateProductCategoryRequest},
-        entity::ProductCategory,
+    domain::{
+        product_categories::{
+            dto::{CreateProductCategoryRequest, UpdateProductCategoryRequest},
+            entity::ProductCategory,
+        },
+        users::entity::UserRole,
     },
     shared::{
         app_state::AppState,
@@ -34,6 +37,7 @@ pub fn category_routes() -> Router<Arc<AppState>> {
 
 #[utoipa::path(
     get,
+    operation_id = "list_product_categories",
     path = "/api/v1/product-categories",
     params(
         PaginationQuery
@@ -52,6 +56,7 @@ pub async fn get_all(
 
 #[utoipa::path(
     post,
+    operation_id = "create_product_category",
     path = "/api/v1/product-categories",
     request_body = CreateProductCategoryRequest,
     responses(
@@ -69,13 +74,14 @@ pub async fn create(
     State(state): State<Arc<AppState>>,
     ValidatedJson(payload): ValidatedJson<CreateProductCategoryRequest>,
 ) -> Result<Json<ApiResponse<ProductCategory>>, AppError> {
-    // auth_user.require_admin()?;
+    // auth_user.require_role(UserRole::Admin)?;
     let category = state.product_category_service.create(payload).await?;
     Ok(Json(ApiResponse { data: category }))
 }
 
 #[utoipa::path(
     get,
+    operation_id = "get_product_category_by_id",
     path = "/api/v1/product-categories/{id}",
     responses(
         (status = 200, description = "Get product category by ID", body = ApiResponse<ProductCategory>),
@@ -95,6 +101,7 @@ pub async fn get_by_id(
 
 #[utoipa::path(
     get,
+    operation_id = "list_product_categories_with_product_count",
     path = "/api/v1/product-categories/with-product-count",
     params(
         PaginationQuery
@@ -116,6 +123,7 @@ pub async fn get_all_with_product_count(
 
 #[utoipa::path(
     put,
+    operation_id = "update_product_category",
     path = "/api/v1/product-categories/{id}",
     request_body = UpdateProductCategoryRequest,
     responses(
@@ -138,13 +146,14 @@ pub async fn update(
     id: Path<Uuid>,
     ValidatedJson(payload): ValidatedJson<UpdateProductCategoryRequest>,
 ) -> Result<Json<ApiResponse<ProductCategory>>, AppError> {
-    auth_user.require_admin()?;
+    auth_user.require_role(&[UserRole::Admin])?;
     let category = state.product_category_service.update(*id, payload).await?;
     Ok(Json(ApiResponse { data: category }))
 }
 
 #[utoipa::path(
     delete,
+    operation_id = "delete_product_category",
     path = "/api/v1/product-categories/{id}",
     responses(
         (status = 200, description = "Product category deleted successfully"),
@@ -164,7 +173,7 @@ pub async fn delete(
     State(state): State<Arc<AppState>>,
     id: Path<Uuid>,
 ) -> Result<Json<ApiResponse<()>>, AppError> {
-    auth_user.require_admin()?;
+    auth_user.require_role(&[UserRole::Admin])?;
     state.product_category_service.delete(*id).await?;
     Ok(Json(ApiResponse { data: () }))
 }

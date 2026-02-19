@@ -4,7 +4,7 @@ use crate::{
     shared::dto::pagination::PaginationQuery,
 };
 use async_trait::async_trait;
-use sqlx::{Pool, Postgres};
+use sqlx::{Pool, Postgres, Row};
 use uuid::Uuid;
 
 pub struct UserRepositoryImpl {
@@ -24,8 +24,15 @@ impl UserRepository for UserRepositoryImpl {
         let limit = query.limit.unwrap_or(10);
         let offset = (page - 1) * limit;
 
-        let users = sqlx::query_as::<_, User>(
-            "SELECT * FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+        let rows = sqlx::query(
+            r#"
+        SELECT 
+            u.*,
+            COUNT(*) OVER() AS total_count
+        FROM users u
+        ORDER BY u.created_at DESC
+        LIMIT $1 OFFSET $2
+        "#,
         )
         .bind(limit as i64)
         .bind(offset as i64)
@@ -33,12 +40,26 @@ impl UserRepository for UserRepositoryImpl {
         .await
         .map_err(|e| AppError::Database(e.to_string()))?;
 
-        let total = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+        if rows.is_empty() {
+            return Ok((vec![], 0));
+        }
 
-        Ok((users, total as u64))
+        let total = rows[0].get::<i64, _>("total_count") as u64;
+
+        let users = rows
+            .into_iter()
+            .map(|row| User {
+                id: row.get("id"),
+                username: row.get("username"),
+                email: row.get("email"),
+                password_hash: row.get("password_hash"),
+                role: row.get("role"),
+                created_at: row.get("created_at"),
+                updated_at: row.get("updated_at"),
+            })
+            .collect();
+
+        Ok((users, total))
     }
 
     async fn find_by_id(&self, id: Uuid) -> Result<User, AppError> {

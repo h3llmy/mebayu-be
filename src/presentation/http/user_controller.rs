@@ -28,6 +28,7 @@ pub fn routes() -> Router<Arc<AppState>> {
 
 #[utoipa::path(
     get,
+    operation_id = "list_users",
     path = "/api/v1/users",
     params(
         PaginationQuery
@@ -53,6 +54,7 @@ pub async fn get_all(
 
 #[utoipa::path(
     get,
+    operation_id = "get_user_by_id",
     path = "/api/v1/users/{id}",
     responses(
         (status = 200, description = "Get user by ID", body = UserResponseDto),
@@ -77,6 +79,7 @@ pub async fn get_by_id(
 
 #[utoipa::path(
     post,
+    operation_id = "create_user",
     path = "/api/v1/users",
     request_body = CreateUserDto,
     responses(
@@ -99,6 +102,7 @@ pub async fn create(
 
 #[utoipa::path(
     put,
+    operation_id = "update_user",
     path = "/api/v1/users/{id}",
     request_body = UpdateUserDto,
     responses(
@@ -127,6 +131,7 @@ pub async fn update(
 
 #[utoipa::path(
     delete,
+    operation_id = "delete_user",
     path = "/api/v1/users/{id}",
     responses(
         (status = 200, description = "User deleted successfully"),
