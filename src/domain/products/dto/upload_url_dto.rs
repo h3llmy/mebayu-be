@@ -7,6 +7,9 @@ use validator::Validate;
 pub struct GetUploadUrlRequest {
     #[validate(length(min = 1))]
     pub file_name: String,
+
+    #[validate(length(min = 1))]
+    pub content_type: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]

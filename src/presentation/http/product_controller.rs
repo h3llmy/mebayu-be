@@ -62,7 +62,12 @@ pub async fn get_upload_url(
 
     let (upload_url, public_url, file_key) = state
         .s3_service
-        .generate_upload_url(&query.file_name, "products", Duration::from_secs(3600))
+        .generate_upload_url(
+            &query.file_name,
+            "products",
+            &query.content_type,
+            Duration::from_secs(3600),
+        )
         .await?;
 
     Ok(Json(ApiResponse {

@@ -49,6 +49,7 @@ impl S3Service {
         &self,
         original_file_name: &str,
         path: &str,
+        content_type: &str,
         expires_in: Duration,
     ) -> Result<(String, String, String), AppError> {
         // extract extension
@@ -64,6 +65,7 @@ impl S3Service {
             .put_object()
             .bucket(&self.bucket)
             .key(&file_key)
+            .content_type(content_type)
             .presigned(
                 aws_sdk_s3::presigning::PresigningConfig::expires_in(expires_in)
                     .map_err(|e| AppError::Storage(e.to_string()))?,
