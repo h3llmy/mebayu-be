@@ -41,6 +41,7 @@ async fn health_check() -> Result<String, AppError> {
 
 pub async fn build_app(pool: PgPool, config: Config) -> Router {
     let redis_client = create_redis_client(&config.redis_url);
+    let s3_client = crate::infrastructure::s3::create_s3_client(&config).await;
 
     let product_repo = Arc::new(ProductRepositoryImpl::new(pool.clone()));
     let category_repo = Arc::new(ProductCategoryRepositoryImpl::new(pool.clone()));
@@ -63,6 +64,7 @@ pub async fn build_app(pool: PgPool, config: Config) -> Router {
         user_service,
         auth_service,
         redis_client,
+        s3_client,
         config: config.clone(),
     });
 

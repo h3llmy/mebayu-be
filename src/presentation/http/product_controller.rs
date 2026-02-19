@@ -12,9 +12,12 @@ use crate::{
         validation::{ValidatedJson, ValidatedQuery},
     },
     domain::products::{
-        dto::{CreateProductRequest, UpdateProductRequest},
+        dto::{
+            CreateProductRequest, GetUploadUrlRequest, GetUploadUrlResponse, UpdateProductRequest,
+        },
         entity::Product,
     },
+    infrastructure::s3::get_presigned_url,
     shared::{
         app_state::AppState,
         dto::{
@@ -25,10 +28,66 @@ use crate::{
 };
 
 use std::sync::Arc;
+use std::time::Duration;
+
 pub fn product_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(get_all).post(create))
+        .route("/upload-url", get(get_upload_url))
         .route("/{id}", get(get_by_id).put(update).delete(delete))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/products/upload-url",
+    responses(
+        (status = 200, description = "Get presigned URL for upload", body = ApiResponse<GetUploadUrlResponse>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
+    ),
+    params(
+        GetUploadUrlRequest
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn get_upload_url(
+    // auth_user: AuthUser,
+    State(state): State<Arc<AppState>>,
+    ValidatedQuery(query): ValidatedQuery<GetUploadUrlRequest>,
+) -> Result<Json<ApiResponse<GetUploadUrlResponse>>, AppError> {
+    // auth_user.require_admin()?;
+
+    let file_extension = std::path::Path::new(&query.file_name)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("png");
+
+    let file_key = format!("products/{}.{}", uuid::Uuid::new_v4(), file_extension);
+
+    let upload_url = get_presigned_url(
+        &state.s3_client,
+        &state.config.s3_bucket,
+        &file_key,
+        Duration::from_secs(3600),
+    )
+    .await
+    .map_err(|e| AppError::Storage(e.to_string()))?;
+
+    let public_url = format!(
+        "{}/{}/{}",
+        state.config.s3_public_url.trim_end_matches('/'),
+        state.config.s3_bucket,
+        file_key
+    );
+
+    Ok(Json(ApiResponse {
+        data: GetUploadUrlResponse {
+            upload_url,
+            public_url,
+            file_key,
+        },
+    }))
 }
 
 #[utoipa::path(

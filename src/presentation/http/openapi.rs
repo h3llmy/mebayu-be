@@ -21,6 +21,7 @@ use utoipa::{
         auth_controller::refresh_token,
         product_controller::get_all,
         product_controller::create,
+        product_controller::get_upload_url,
         product_controller::get_by_id,
         product_controller::update,
         product_controller::delete,
@@ -44,12 +45,12 @@ use utoipa::{
     components(
         schemas(
             AuthResponseDto, LoginDto, RefreshTokenDto, RegisterDto,
-            CreateProductRequest, UpdateProductRequest, Product, ProductImage,
+            CreateProductRequest, UpdateProductRequest, GetUploadUrlRequest, GetUploadUrlResponse, Product, ProductImage,
             CreateProductCategoryRequest, UpdateProductCategoryRequest, ProductCategory,
             CreateProductMaterialRequest, UpdateProductMaterialRequest, ProductMaterial,
             CreateUserDto, UpdateUserDto, UserResponseDto, UserRole,
             PaginationQuery, SortOrder, ErrorResponse,
-            ApiResponse<Product>, ApiResponse<UserResponseDto>, ApiResponse<ProductCategory>, ApiResponse<ProductMaterial>,
+            ApiResponse<Product>, ApiResponse<UserResponseDto>, ApiResponse<ProductCategory>, ApiResponse<ProductMaterial>, ApiResponse<GetUploadUrlResponse>,
             PaginationResponse<Vec<Product>>, PaginationResponse<Vec<ProductCategory>>, PaginationResponse<Vec<ProductMaterial>>, PaginationResponse<Vec<UserResponseDto>>
         )
     ),
