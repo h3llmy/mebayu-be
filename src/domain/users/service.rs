@@ -4,7 +4,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
-    core::{error::AppError, security::password},
+    core::{config::Config, error::AppError, security::password},
     domain::users::dto::{CreateUserDto, UpdateUserDto, UserResponseDto},
     shared::dto::{pagination::PaginationQuery, response::PaginationResponse},
 };
@@ -16,6 +16,7 @@ pub trait UserRepository: Send + Sync {
     async fn find_all(&self, query: &PaginationQuery) -> Result<(Vec<User>, u64), AppError>;
     async fn find_by_id(&self, id: Uuid) -> Result<User, AppError>;
     async fn find_by_username(&self, username: &str) -> Result<User, AppError>;
+    async fn is_admin_exists(&self) -> Result<bool, AppError>;
     // async fn find_by_email(&self, email: &str) -> Result<User, AppError>;
     async fn create(&self, user: &User) -> Result<User, AppError>;
     async fn update(&self, id: Uuid, user: &User) -> Result<User, AppError>;
@@ -24,11 +25,12 @@ pub trait UserRepository: Send + Sync {
 
 pub struct UserServiceImpl<R: UserRepository> {
     repository: Arc<R>,
+    config: Config,
 }
 
 impl<R: UserRepository> UserServiceImpl<R> {
-    pub fn new(repository: Arc<R>) -> Self {
-        Self { repository }
+    pub fn new(repository: Arc<R>, config: Config) -> Self {
+        Self { repository, config }
     }
 
     pub async fn get_all(
@@ -62,8 +64,50 @@ impl<R: UserRepository> UserServiceImpl<R> {
     //     self.repository.find_by_email(email).await
     // }
 
+    pub async fn create_initial_user(&self) {
+        match self.repository.is_admin_exists().await {
+            Ok(exists) => {
+                if exists {
+                    tracing::info!("Skiping admin creation, admin already exists");
+                    return;
+                }
+            }
+            Err(error) => {
+                tracing::error!("failed to check admin exists {:?}", error);
+                return;
+            }
+        }
+
+        let password_hash = match password::hash_password(&self.config.admin_password) {
+            Ok(hash) => hash,
+            Err(error) => {
+                tracing::error!("failed to hash password {:?}", error);
+                return;
+            }
+        };
+
+        let user = User {
+            id: Uuid::new_v4(),
+            username: self.config.admin_username.clone(),
+            email: self.config.admin_email.clone(),
+            password_hash,
+            role: UserRole::Admin.to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        match self.repository.create(&user).await {
+            Ok(_) => {
+                tracing::info!("Admin created successfully");
+            }
+            Err(error) => {
+                tracing::error!("failed to init admin {:?}", error);
+            }
+        };
+    }
+
     pub async fn create(&self, req: CreateUserDto) -> Result<User, AppError> {
-        let password_hash = crate::core::security::password::hash_password(&req.password)?;
+        let password_hash = password::hash_password(&req.password)?;
 
         let user = User {
             id: Uuid::new_v4(),

@@ -1,6 +1,9 @@
 use crate::{
     core::error::AppError,
-    domain::users::{entity::User, service::UserRepository},
+    domain::users::{
+        entity::{User, UserRole},
+        service::UserRepository,
+    },
     shared::dto::pagination::PaginationQuery,
 };
 use async_trait::async_trait;
@@ -69,6 +72,21 @@ impl UserRepository for UserRepositoryImpl {
             .await
             .map_err(|e| AppError::Database(e.to_string()))?
             .ok_or_else(|| AppError::NotFound("User not found".to_string()))
+    }
+
+    async fn is_admin_exists(&self) -> Result<bool, AppError> {
+        let row = sqlx::query(
+            "SELECT EXISTS (
+                SELECT 1
+                FROM users
+                WHERE role = $1
+            )",
+        )
+        .bind(UserRole::Admin.to_string())
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
+        Ok(row.get::<bool, _>("exists"))
     }
 
     async fn find_by_username(&self, username: &str) -> Result<User, AppError> {

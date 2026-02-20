@@ -52,11 +52,13 @@ pub async fn build_app(pool: PgPool, config: Config) -> Router {
     let product_service = Arc::new(ProductServiceImpl::new(product_repo, s3_service.clone()));
     let product_category_service = Arc::new(ProductCategoryServiceImpl::new(category_repo));
     let product_material_service = Arc::new(ProductMaterialServiceImpl::new(material_repo));
-    let user_service = Arc::new(UserServiceImpl::new(user_repo.clone()));
+    let user_service = Arc::new(UserServiceImpl::new(user_repo.clone(), config.clone()));
     let auth_service = Arc::new(AuthService::new(
         user_service.clone(),
         config.jwt_secret.clone(),
     ));
+
+    user_service.create_initial_user().await;
 
     let state = Arc::new(AppState {
         product_service,

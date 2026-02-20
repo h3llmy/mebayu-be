@@ -38,11 +38,11 @@ pub fn storage_routes() -> Router<Arc<AppState>> {
     )
 )]
 pub async fn get_presign_url(
-    // auth_user: AuthUser,
+    auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
     ValidatedQuery(query): ValidatedQuery<GetUploadUrlRequest>,
 ) -> Result<Json<ApiResponse<GetUploadUrlResponse>>, AppError> {
-    // auth_user.require_role(&[UserRole::Admin])?;
+    auth_user.require_role(&[UserRole::Admin])?;
 
     let (upload_url, public_url, file_key) = state
         .s3_service
