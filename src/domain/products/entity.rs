@@ -11,7 +11,6 @@ use crate::domain::product_materials::entity::ProductMaterial;
 pub struct Product {
     pub id: Uuid,
     pub name: String,
-    pub material: String, // Keeping this for now as it exists in DB
     pub price: f64,
     pub description: String,
     pub status: String,

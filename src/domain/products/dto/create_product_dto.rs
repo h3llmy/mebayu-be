@@ -14,9 +14,6 @@ pub struct CreateProductRequest {
     #[validate(length(min = 1))]
     pub name: String,
 
-    #[validate(length(min = 1))]
-    pub material: String,
-
     #[validate(range(min = 0.01))]
     pub price: f64,
 

@@ -1,12 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE products SET name = $2, material = $3, price = $4, description = $5, status = $6, updated_at = $7 WHERE id = $1",
+  "query": "UPDATE products SET name = $2, price = $3, description = $4, status = $5, updated_at = $6 WHERE id = $1",
   "describe": {
     "columns": [],
     "parameters": {
       "Left": [
         "Uuid",
-        "Varchar",
         "Varchar",
         "Float8",
         "Text",
@@ -16,5 +15,5 @@
     },
     "nullable": []
   },
-  "hash": "2f985d008d1e70779eff0966af57d588cb0bf5b4ce54a2a568496975c39fdb45"
+  "hash": "7ac66514d4659e443bab6241f270722d9ec5b42ef63d1b7133d7255be292da8a"
 }

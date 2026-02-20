@@ -14,9 +14,6 @@ pub struct UpdateProductRequest {
     #[validate(length(min = 1))]
     pub name: Option<String>,
 
-    #[validate(length(min = 1))]
-    pub material: Option<String>,
-
     #[validate(range(min = 0.0))]
     pub price: Option<f64>,
 

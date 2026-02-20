@@ -15,46 +15,41 @@
       },
       {
         "ordinal": 2,
-        "name": "material",
-        "type_info": "Varchar"
-      },
-      {
-        "ordinal": 3,
         "name": "price",
         "type_info": "Float8"
       },
       {
-        "ordinal": 4,
+        "ordinal": 3,
         "name": "description",
         "type_info": "Text"
       },
       {
-        "ordinal": 5,
+        "ordinal": 4,
         "name": "status",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 6,
+        "ordinal": 5,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 7,
+        "ordinal": 6,
         "name": "updated_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 8,
+        "ordinal": 7,
         "name": "categories!: serde_json::Value",
         "type_info": "Json"
       },
       {
-        "ordinal": 9,
+        "ordinal": 8,
         "name": "product_materials!: serde_json::Value",
         "type_info": "Json"
       },
       {
-        "ordinal": 10,
+        "ordinal": 9,
         "name": "images!: serde_json::Value",
         "type_info": "Json"
       }
@@ -65,7 +60,6 @@
       ]
     },
     "nullable": [
-      false,
       false,
       false,
       false,

@@ -129,7 +129,6 @@ impl ProductRepository for ProductRepositoryImpl {
                 Product {
                     id: r.get("id"),
                     name: r.get("name"),
-                    material: r.get("material"),
                     price: r.get("price"),
                     description: r.get("description"),
                     status: r.get("status"),
@@ -207,7 +206,6 @@ impl ProductRepository for ProductRepositoryImpl {
         Ok(Product {
             id: row.id,
             name: row.name,
-            material: row.material,
             price: row.price,
             description: row.description,
             status: row.status,
@@ -254,11 +252,10 @@ impl ProductRepository for ProductRepositoryImpl {
 
         // 2. Insert product
         sqlx::query!(
-            "INSERT INTO products (id, name, material, price, description, status, created_at, updated_at)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+            "INSERT INTO products (id, name, price, description, status, created_at, updated_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)",
             product.id,
             product.name,
-            product.material,
             product.price,
             product.description,
             product.status,
@@ -324,10 +321,9 @@ impl ProductRepository for ProductRepositoryImpl {
 
         // 1. Update product basic fields
         sqlx::query!(
-            "UPDATE products SET name = $2, material = $3, price = $4, description = $5, status = $6, updated_at = $7 WHERE id = $1",
+            "UPDATE products SET name = $2, price = $3, description = $4, status = $5, updated_at = $6 WHERE id = $1",
             id,
             product.name,
-            product.material,
             product.price,
             product.description,
             product.status,

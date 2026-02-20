@@ -1,12 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO products (id, name, material, price, description, status, created_at, updated_at)\n             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+  "query": "INSERT INTO products (id, name, price, description, status, created_at, updated_at)\n             VALUES ($1,$2,$3,$4,$5,$6,$7)",
   "describe": {
     "columns": [],
     "parameters": {
       "Left": [
         "Uuid",
-        "Varchar",
         "Varchar",
         "Float8",
         "Text",
@@ -17,5 +16,5 @@
     },
     "nullable": []
   },
-  "hash": "41d2436558546f93f410b49838c94e60dc37daebeb1d8850224c848c397e0a11"
+  "hash": "433f0f0ce7f81005316468915cb72e34fc1c8677c5a8d9d74605730f60dffea7"
 }
