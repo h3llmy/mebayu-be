@@ -25,7 +25,7 @@ pub fn storage_routes() -> Router<Arc<AppState>> {
 #[utoipa::path(
     get,
     operation_id = "get_presign_url",
-    path = "/api/v1/storage/get-presign-url",
+    path = "/api/v1/storages/get-presign-url",
     params(
         GetUploadUrlRequest
     ),
@@ -38,11 +38,11 @@ pub fn storage_routes() -> Router<Arc<AppState>> {
     )
 )]
 pub async fn get_presign_url(
-    auth_user: AuthUser,
+    // auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
     ValidatedQuery(query): ValidatedQuery<GetUploadUrlRequest>,
 ) -> Result<Json<ApiResponse<GetUploadUrlResponse>>, AppError> {
-    auth_user.require_role(&[UserRole::Admin])?;
+    // auth_user.require_role(&[UserRole::Admin])?;
 
     let (upload_url, public_url, file_key) = state
         .s3_service
