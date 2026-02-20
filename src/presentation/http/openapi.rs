@@ -1,11 +1,13 @@
-use crate::core::error::ErrorResponse;
-use crate::domain::{
-    auth::dto::*, product_categories::dto::*, product_categories::entity::*,
-    product_materials::dto::*, product_materials::entity::*, products::dto::*, products::entity::*,
-    users::dto::*, users::entity::*,
+use crate::{
+    core::error::ErrorResponse,
+    domain::{
+        auth::dto::*, product_categories::dto::*, product_categories::entity::*,
+        product_materials::dto::*, product_materials::entity::*, products::dto::*,
+        products::entity::*, users::dto::*, users::entity::*,
+    },
+    presentation::http::*,
+    shared::dto::{object_storage::*, pagination::*, response::*},
 };
-use crate::presentation::http::*;
-use crate::shared::dto::{pagination::*, response::*};
 use utoipa::{
     Modify, OpenApi,
     openapi::security::{Http, HttpAuthScheme, SecurityScheme},
@@ -21,7 +23,6 @@ use utoipa::{
         auth_controller::refresh_token,
         product_controller::get_all,
         product_controller::create,
-        product_controller::get_upload_url,
         product_controller::get_by_id,
         product_controller::update,
         product_controller::delete,
@@ -36,6 +37,7 @@ use utoipa::{
         product_material_controller::get_by_id,
         product_material_controller::update,
         product_material_controller::delete,
+        storage_controller::get_presign_url,
         user_controller::get_all,
         user_controller::get_by_id,
         user_controller::create,

@@ -75,6 +75,7 @@ pub async fn build_app(pool: PgPool, config: Config) -> Router {
         .nest("/product-categories", category_routes())
         .nest("/product-materials", product_material_routes())
         .nest("/users", routes())
+        .nest("/storages", storage_routes())
         .layer(middleware::from_fn_with_state(
             state.clone(),
             rate_limiter_middleware,

@@ -10,6 +10,9 @@ pub struct GetUploadUrlRequest {
 
     #[validate(length(min = 1))]
     pub content_type: String,
+
+    #[validate(length(min = 1))]
+    pub folder: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]

@@ -13,10 +13,7 @@ use crate::{
     },
     domain::{
         products::{
-            dto::{
-                CreateProductRequest, GetUploadUrlRequest, GetUploadUrlResponse,
-                UpdateProductRequest,
-            },
+            dto::{CreateProductRequest, UpdateProductRequest},
             entity::Product,
         },
         users::entity::UserRole,
@@ -31,52 +28,10 @@ use crate::{
 };
 
 use std::sync::Arc;
-use std::time::Duration;
 pub fn product_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(get_all).post(create))
-        .route("/upload-url", get(get_upload_url))
         .route("/{id}", get(get_by_id).put(update).delete(delete))
-}
-
-#[utoipa::path(
-    get,
-    path = "/api/v1/products/upload-url",
-    responses(
-        (status = 200, description = "Get presigned URL for upload", body = ApiResponse<GetUploadUrlResponse>),
-        (status = 401, description = "Unauthorized", body = ErrorResponse)
-    ),
-    params(
-        GetUploadUrlRequest
-    ),
-    security(
-        ("jwt" = [])
-    )
-)]
-pub async fn get_upload_url(
-    // auth_user: AuthUser,
-    State(state): State<Arc<AppState>>,
-    ValidatedQuery(query): ValidatedQuery<GetUploadUrlRequest>,
-) -> Result<Json<ApiResponse<GetUploadUrlResponse>>, AppError> {
-    // auth_user.require_role(&[UserRole::Admin])?;
-
-    let (upload_url, public_url, file_key) = state
-        .s3_service
-        .generate_upload_url(
-            &query.file_name,
-            "products",
-            &query.content_type,
-            Duration::from_secs(3600),
-        )
-        .await?;
-
-    Ok(Json(ApiResponse {
-        data: GetUploadUrlResponse {
-            upload_url,
-            public_url,
-            file_key,
-        },
-    }))
 }
 
 #[utoipa::path(
