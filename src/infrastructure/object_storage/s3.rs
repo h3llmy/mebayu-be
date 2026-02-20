@@ -84,4 +84,34 @@ impl S3Service {
 
         Ok((upload_url, public_url, file_key))
     }
+
+    pub async fn validate_object(&self, url: &str) -> Result<(), AppError> {
+        let key = self.extract_key(url).map_err(|e| AppError::Validation(
+            vec![("image_urls".to_string(), vec![e])].into_iter().collect()
+        ))?;
+
+        self.client
+            .head_object()
+            .bucket(&self.bucket)
+            .key(&key)
+            .send()
+            .await
+            .map_err(|_| AppError::Validation(
+                vec![("image_urls".to_string(), vec![format!("File not found in storage: {}", url)])].into_iter().collect()
+            ))?;
+
+        Ok(())
+    }
+
+    fn extract_key(&self, url: &str) -> Result<String, String> {
+        // Expected format: http://.../bucket/key
+        // For MinIO/S3 with path style: http://host:port/bucket/key
+        
+        let bucket_part = format!("/{}/", self.bucket);
+        if let Some(pos) = url.find(&bucket_part) {
+            Ok(url[pos + bucket_part.len()..].to_string())
+        } else {
+            Err("Invalid storage URL format".to_string())
+        }
+    }
 }
