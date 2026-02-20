@@ -1,13 +1,7 @@
-use axum::{
-    Json, Router,
-    extract::{Path, State},
-    routing::get,
-};
-use uuid::Uuid;
-
 use crate::{
     core::{
         error::{AppError, ErrorResponse},
+        middleware::auth::AuthUser,
         validation::{ValidatedJson, ValidatedQuery},
     },
     domain::users::dto::{CreateUserDto, UpdateUserDto, UserResponseDto},
@@ -16,9 +10,13 @@ use crate::{
         dto::{pagination::PaginationQuery, response::PaginationResponse},
     },
 };
-
-use crate::core::middleware::auth::AuthUser;
+use axum::{
+    Json, Router,
+    extract::{Path, State},
+    routing::get,
+};
 use std::sync::Arc;
+use uuid::Uuid;
 
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
