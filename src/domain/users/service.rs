@@ -11,6 +11,7 @@ use crate::{
 
 use super::entity::{User, UserRole};
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait UserRepository: Send + Sync {
     async fn find_all(&self, query: &PaginationQuery) -> Result<(Vec<User>, u64), AppError>;
@@ -23,13 +24,13 @@ pub trait UserRepository: Send + Sync {
     async fn delete(&self, id: Uuid) -> Result<(), AppError>;
 }
 
-pub struct UserServiceImpl<R: UserRepository> {
-    repository: Arc<R>,
+pub struct UserServiceImpl {
+    repository: Arc<dyn UserRepository>,
     config: Config,
 }
 
-impl<R: UserRepository> UserServiceImpl<R> {
-    pub fn new(repository: Arc<R>, config: Config) -> Self {
+impl UserServiceImpl {
+    pub fn new(repository: Arc<dyn UserRepository>, config: Config) -> Self {
         Self { repository, config }
     }
 
@@ -144,5 +145,174 @@ impl<R: UserRepository> UserServiceImpl<R> {
 
     pub async fn delete(&self, id: Uuid) -> Result<(), AppError> {
         self.repository.delete(id).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    #[tokio::test]
+    async fn test_get_by_id() {
+        let mut mock_repo = MockUserRepository::new();
+        let id = Uuid::new_v4();
+        let expected_user = User {
+            id,
+            username: "testuser".to_string(),
+            email: "test@example.com".to_string(),
+            password_hash: "hash".to_string(),
+            role: "user".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let user_clone = expected_user.clone();
+        mock_repo
+            .expect_find_by_id()
+            .with(mockall::predicate::eq(id))
+            .times(1)
+            .returning(move |_| Ok(user_clone.clone()));
+
+        let config = Config::default();
+        let service = UserServiceImpl::new(Arc::new(mock_repo), config);
+        let result = service.get_by_id(id).await.unwrap();
+
+        assert_eq!(result.id, expected_user.id);
+        assert_eq!(result.username, expected_user.username);
+    }
+
+    #[tokio::test]
+    async fn test_get_by_username() {
+        let mut mock_repo = MockUserRepository::new();
+        let username = "testuser";
+        let expected_user = User {
+            id: Uuid::new_v4(),
+            username: username.to_string(),
+            email: "test@example.com".to_string(),
+            password_hash: "hash".to_string(),
+            role: "user".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let user_clone = expected_user.clone();
+        mock_repo
+            .expect_find_by_username()
+            .with(mockall::predicate::eq(username))
+            .times(1)
+            .returning(move |_| Ok(user_clone.clone()));
+
+        let config = Config::default();
+        let service = UserServiceImpl::new(Arc::new(mock_repo), config);
+        let result = service.get_by_username(username).await.unwrap();
+
+        assert_eq!(result.username, expected_user.username);
+    }
+
+    #[tokio::test]
+    async fn test_get_all() {
+        let mut mock_repo = MockUserRepository::new();
+        let query = PaginationQuery::default();
+        let total_data = 1;
+        let users = vec![User {
+            id: Uuid::new_v4(),
+            username: "test".to_string(),
+            email: "test@example.com".to_string(),
+            password_hash: "hash".to_string(),
+            role: "user".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }];
+
+        let users_clone = users.clone();
+        mock_repo
+            .expect_find_all()
+            .times(1)
+            .returning(move |_| Ok((users_clone.clone(), total_data)));
+
+        let config = Config::default();
+        let service = UserServiceImpl::new(Arc::new(mock_repo), config);
+        let result = service.get_all(&query).await.unwrap();
+
+        assert_eq!(result.total_data, total_data);
+        assert_eq!(result.data.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_create() {
+        let mut mock_repo = MockUserRepository::new();
+        let req = CreateUserDto {
+            username: "newuser".to_string(),
+            email: "new@example.com".to_string(),
+            password: "password".to_string(),
+        };
+
+        mock_repo
+            .expect_create()
+            .times(1)
+            .returning(|user| Ok(user.clone()));
+
+        let config = Config::default();
+        let service = UserServiceImpl::new(Arc::new(mock_repo), config);
+        let result = service.create(req).await.unwrap();
+
+        assert_eq!(result.username, "newuser");
+    }
+
+    #[tokio::test]
+    async fn test_update() {
+        let mut mock_repo = MockUserRepository::new();
+        let id = Uuid::new_v4();
+        let existing = User {
+            id,
+            username: "olduser".to_string(),
+            email: "old@example.com".to_string(),
+            password_hash: "hash".to_string(),
+            role: "user".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let req = UpdateUserDto {
+            username: Some("newuser".to_string()),
+            email: Some("new@example.com".to_string()),
+            password: None,
+        };
+
+        let existing_clone = existing.clone();
+        mock_repo
+            .expect_find_by_id()
+            .with(mockall::predicate::eq(id))
+            .returning(move |_| Ok(existing_clone.clone()));
+
+        mock_repo
+            .expect_update()
+            .with(mockall::predicate::eq(id), mockall::predicate::always())
+            .times(1)
+            .returning(|_, updated| Ok(updated.clone()));
+
+        let config = Config::default();
+        let service = UserServiceImpl::new(Arc::new(mock_repo), config);
+        let result = service.update(id, req).await.unwrap();
+
+        assert_eq!(result.username, "newuser");
+    }
+
+    #[tokio::test]
+    async fn test_delete() {
+        let mut mock_repo = MockUserRepository::new();
+        let id = Uuid::new_v4();
+
+        mock_repo
+            .expect_delete()
+            .with(mockall::predicate::eq(id))
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let config = Config::default();
+        let service = UserServiceImpl::new(Arc::new(mock_repo), config);
+        let result = service.delete(id).await;
+
+        assert!(result.is_ok());
     }
 }

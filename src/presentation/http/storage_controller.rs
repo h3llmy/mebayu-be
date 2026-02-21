@@ -9,6 +9,7 @@ use crate::{
         validation::ValidatedJson,
     },
     domain::users::entity::UserRole,
+    infrastructure::object_storage::s3::Storage,
     shared::{
         app_state::AppState,
         dto::{

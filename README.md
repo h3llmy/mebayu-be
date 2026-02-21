@@ -91,13 +91,13 @@ sqlx migrate add create_users_table
 This creates files inside:
 
 ```
-migrations/
+src/infrastructure/repository/migrations/
 ```
 
 Example structure:
 
 ```
-migrations/
+src/infrastructure/repository/migrations/
  ├── 20260215120000_create_users_table.up.sql
  └── 20260215120000_create_users_table.down.sql
 ```
@@ -107,19 +107,19 @@ migrations/
 ### Run Migrations
 
 ```bash
-sqlx migrate run
+sqlx migrate run --source src/infrastructure/repository/migrations
 ```
 
 Revert last migration:
 
 ```bash
-sqlx migrate revert
+sqlx migrate revert --source src/infrastructure/repository/migrations
 ```
 
 Check migration status:
 
 ```bash
-sqlx migrate info
+sqlx migrate info --source src/infrastructure/repository/migrations
 ```
 
 ---
@@ -141,7 +141,7 @@ cargo run
 ```bash
 sqlx database drop
 sqlx database create
-sqlx migrate run
+sqlx migrate run --source src/infrastructure/repository/migrations
 ```
 
 Or with Docker:

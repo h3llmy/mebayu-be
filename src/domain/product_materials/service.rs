@@ -10,6 +10,7 @@ use crate::{
 
 use super::entity::ProductMaterial;
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait ProductMaterialRepository: Send + Sync {
     async fn find_all(
@@ -26,12 +27,12 @@ pub trait ProductMaterialRepository: Send + Sync {
     async fn delete(&self, id: Uuid) -> Result<(), AppError>;
 }
 
-pub struct ProductMaterialServiceImpl<R: ProductMaterialRepository> {
-    repository: Arc<R>,
+pub struct ProductMaterialServiceImpl {
+    repository: Arc<dyn ProductMaterialRepository>,
 }
 
-impl<R: ProductMaterialRepository> ProductMaterialServiceImpl<R> {
-    pub fn new(repository: Arc<R>) -> Self {
+impl ProductMaterialServiceImpl {
+    pub fn new(repository: Arc<dyn ProductMaterialRepository>) -> Self {
         Self { repository }
     }
 
@@ -87,5 +88,128 @@ impl<R: ProductMaterialRepository> ProductMaterialServiceImpl<R> {
 
     pub async fn delete(&self, id: Uuid) -> Result<(), AppError> {
         self.repository.delete(id).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    #[tokio::test]
+    async fn test_get_by_id() {
+        let mut mock_repo = MockProductMaterialRepository::new();
+        let id = Uuid::new_v4();
+        let expected_material = ProductMaterial {
+            id,
+            name: "Test Material".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let material_clone = expected_material.clone();
+        mock_repo
+            .expect_find_by_id()
+            .with(mockall::predicate::eq(id))
+            .times(1)
+            .returning(move |_| Ok(material_clone.clone()));
+
+        let service = ProductMaterialServiceImpl::new(Arc::new(mock_repo));
+        let result = service.get_by_id(id).await.unwrap();
+
+        assert_eq!(result.id, expected_material.id);
+        assert_eq!(result.name, expected_material.name);
+    }
+
+    #[tokio::test]
+    async fn test_get_all() {
+        let mut mock_repo = MockProductMaterialRepository::new();
+        let query = PaginationQuery::default();
+        let total_data = 1;
+        let materials = vec![ProductMaterial {
+            id: Uuid::new_v4(),
+            name: "Test".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }];
+
+        let materials_clone = materials.clone();
+        mock_repo
+            .expect_find_all()
+            .times(1)
+            .returning(move |_| Ok((materials_clone.clone(), total_data)));
+
+        let service = ProductMaterialServiceImpl::new(Arc::new(mock_repo));
+        let result = service.get_all(&query).await.unwrap();
+
+        assert_eq!(result.total_data, total_data);
+        assert_eq!(result.data.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_create() {
+        let mut mock_repo = MockProductMaterialRepository::new();
+        let req = CreateProductMaterialRequest {
+            name: "New Material".to_string(),
+        };
+
+        mock_repo
+            .expect_create()
+            .times(1)
+            .returning(|material| Ok(material.clone()));
+
+        let service = ProductMaterialServiceImpl::new(Arc::new(mock_repo));
+        let result = service.create(req).await.unwrap();
+
+        assert_eq!(result.name, "New Material");
+    }
+
+    #[tokio::test]
+    async fn test_update() {
+        let mut mock_repo = MockProductMaterialRepository::new();
+        let id = Uuid::new_v4();
+        let existing = ProductMaterial {
+            id,
+            name: "Old Name".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let req = UpdateProductMaterialRequest {
+            name: Some("New Name".to_string()),
+        };
+
+        let existing_clone = existing.clone();
+        mock_repo
+            .expect_find_by_id()
+            .with(mockall::predicate::eq(id))
+            .returning(move |_| Ok(existing_clone.clone()));
+
+        mock_repo
+            .expect_update()
+            .with(mockall::predicate::eq(id), mockall::predicate::always())
+            .times(1)
+            .returning(|_, updated| Ok(updated.clone()));
+
+        let service = ProductMaterialServiceImpl::new(Arc::new(mock_repo));
+        let result = service.update(id, req).await.unwrap();
+
+        assert_eq!(result.name, "New Name");
+    }
+
+    #[tokio::test]
+    async fn test_delete() {
+        let mut mock_repo = MockProductMaterialRepository::new();
+        let id = Uuid::new_v4();
+
+        mock_repo
+            .expect_delete()
+            .with(mockall::predicate::eq(id))
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let service = ProductMaterialServiceImpl::new(Arc::new(mock_repo));
+        let result = service.delete(id).await;
+
+        assert!(result.is_ok());
     }
 }

@@ -7,24 +7,16 @@ use crate::{
         product_materials::service::ProductMaterialServiceImpl,
         products::service::ProductServiceImpl, users::service::UserServiceImpl,
     },
-    infrastructure::{
-        object_storage::s3::S3Service,
-        repository::{
-            product_category_repository_impl::ProductCategoryRepositoryImpl,
-            product_material_repository_impl::ProductMaterialRepositoryImpl,
-            product_repository_impl::ProductRepositoryImpl,
-            user_repository_impl::UserRepositoryImpl,
-        },
-    },
+    infrastructure::object_storage::s3::S3Service,
 };
 
 #[derive(Clone)]
 pub struct AppState {
-    pub product_service: Arc<ProductServiceImpl<ProductRepositoryImpl>>,
-    pub product_category_service: Arc<ProductCategoryServiceImpl<ProductCategoryRepositoryImpl>>,
-    pub product_material_service: Arc<ProductMaterialServiceImpl<ProductMaterialRepositoryImpl>>,
-    pub user_service: Arc<UserServiceImpl<UserRepositoryImpl>>,
-    pub auth_service: Arc<AuthService<UserRepositoryImpl>>,
+    pub product_service: Arc<ProductServiceImpl>,
+    pub product_category_service: Arc<ProductCategoryServiceImpl>,
+    pub product_material_service: Arc<ProductMaterialServiceImpl>,
+    pub user_service: Arc<UserServiceImpl>,
+    pub auth_service: Arc<AuthService>,
     pub redis_client: redis::Client,
     pub s3_service: Arc<S3Service>,
     pub config: Config,

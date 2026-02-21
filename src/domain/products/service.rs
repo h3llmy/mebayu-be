@@ -5,12 +5,13 @@ use uuid::Uuid;
 use crate::{
     core::error::AppError,
     domain::products::dto::{CreateProductRequest, UpdateProductRequest},
-    infrastructure::object_storage::s3::S3Service,
+    infrastructure::object_storage::s3::Storage,
     shared::dto::{pagination::PaginationQuery, response::PaginationResponse},
 };
 
 use super::entity::{Product, ProductImage};
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait ProductRepository: Send + Sync {
     async fn find_all(&self, query: &PaginationQuery) -> Result<(Vec<Product>, u64), AppError>;
@@ -20,13 +21,13 @@ pub trait ProductRepository: Send + Sync {
     async fn delete(&self, id: Uuid) -> Result<(), AppError>;
 }
 
-pub struct ProductServiceImpl<R: ProductRepository> {
-    repository: Arc<R>,
-    s3_service: Arc<S3Service>,
+pub struct ProductServiceImpl {
+    repository: Arc<dyn ProductRepository>,
+    s3_service: Arc<dyn Storage>,
 }
 
-impl<R: ProductRepository> ProductServiceImpl<R> {
-    pub fn new(repository: Arc<R>, s3_service: Arc<S3Service>) -> Self {
+impl ProductServiceImpl {
+    pub fn new(repository: Arc<dyn ProductRepository>, s3_service: Arc<dyn Storage>) -> Self {
         Self {
             repository,
             s3_service,
@@ -131,5 +132,158 @@ impl<R: ProductRepository> ProductServiceImpl<R> {
 
     pub async fn delete(&self, id: Uuid) -> Result<(), AppError> {
         self.repository.delete(id).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::products::entity::Product;
+    use crate::infrastructure::object_storage::s3::MockStorage;
+    use chrono::Utc;
+
+    #[tokio::test]
+    async fn test_get_by_id() {
+        let mut mock_repo = MockProductRepository::new();
+        let mock_s3 = MockStorage::new();
+
+        let id = Uuid::new_v4();
+        let expected_product = Product {
+            id,
+            name: "Test Product".to_string(),
+            price: 100.0,
+            description: "Desc".to_string(),
+            status: "active".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            category_ids: vec![],
+            material_ids: vec![],
+            categories: vec![],
+            product_materials: vec![],
+            images: vec![],
+        };
+
+        let product_clone = expected_product.clone();
+        mock_repo
+            .expect_find_by_id()
+            .with(mockall::predicate::eq(id))
+            .times(1)
+            .returning(move |_| Ok(product_clone.clone()));
+
+        let service = ProductServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_s3));
+        let result = service.get_by_id(id).await.unwrap();
+
+        assert_eq!(result.id, expected_product.id);
+        assert_eq!(result.name, expected_product.name);
+    }
+
+    #[tokio::test]
+    async fn test_get_all() {
+        let mut mock_repo = MockProductRepository::new();
+        let mock_s3 = MockStorage::new();
+        let query = PaginationQuery::default();
+        let total_data = 1;
+        let products = vec![Product {
+            id: Uuid::new_v4(),
+            name: "Test".to_string(),
+            price: 100.0,
+            description: "Desc".to_string(),
+            status: "active".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            category_ids: vec![],
+            material_ids: vec![],
+            categories: vec![],
+            product_materials: vec![],
+            images: vec![],
+        }];
+
+        let products_clone = products.clone();
+        mock_repo
+            .expect_find_all()
+            .times(1)
+            .returning(move |_| Ok((products_clone.clone(), total_data)));
+
+        let service = ProductServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_s3));
+        let result = service.get_all(&query).await.unwrap();
+
+        assert_eq!(result.total_data, total_data);
+        assert_eq!(result.data.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_create_success() {
+        let mut mock_repo = MockProductRepository::new();
+        let mut mock_s3 = MockStorage::new();
+        let req = CreateProductRequest {
+            name: "New Product".to_string(),
+            price: 100.0,
+            description: "Desc".to_string(),
+            status: "active".to_string(),
+            category_ids: vec![Uuid::new_v4()],
+            material_ids: vec![Uuid::new_v4()],
+            image_urls: vec!["http://example.com/image.png".to_string()],
+        };
+
+        mock_s3
+            .expect_validate_object()
+            .with(mockall::predicate::eq("http://example.com/image.png"))
+            .times(1)
+            .returning(|_| Ok(()));
+
+        mock_repo
+            .expect_create()
+            .times(1)
+            .returning(|product| Ok(product.clone()));
+
+        let service = ProductServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_s3));
+        let result = service.create(req).await.unwrap();
+
+        assert_eq!(result.name, "New Product");
+        assert_eq!(result.images.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_create_image_not_found() {
+        let mock_repo = MockProductRepository::new();
+        let mut mock_s3 = MockStorage::new();
+        let req = CreateProductRequest {
+            name: "New Product".to_string(),
+            price: 100.0,
+            description: "Desc".to_string(),
+            status: "active".to_string(),
+            category_ids: vec![Uuid::new_v4()],
+            material_ids: vec![Uuid::new_v4()],
+            image_urls: vec!["http://example.com/bad.png".to_string()],
+        };
+
+        mock_s3
+            .expect_validate_object()
+            .with(mockall::predicate::eq("http://example.com/bad.png"))
+            .times(1)
+            .returning(|_| Err(AppError::NotFound("Image not found".to_string())));
+
+        let service = ProductServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_s3));
+        let result = service.create(req).await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_delete() {
+        let mut mock_repo = MockProductRepository::new();
+        let mock_s3 = MockStorage::new();
+        let id = Uuid::new_v4();
+
+        mock_repo
+            .expect_delete()
+            .with(mockall::predicate::eq(id))
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let service = ProductServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_s3));
+        let result = service.delete(id).await;
+
+        assert!(result.is_ok());
     }
 }
