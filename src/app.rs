@@ -1,10 +1,19 @@
 use std::sync::Arc;
 
-use axum::{Router, middleware, routing::get};
+use axum::{
+    Router,
+    http::{Method, header},
+    middleware,
+    routing::get,
+};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use sqlx::PgPool;
 use tower::ServiceBuilder;
-use tower_http::{compression::CompressionLayer, trace::TraceLayer};
+use tower_http::{
+    compression::CompressionLayer,
+    cors::{Any, CorsLayer},
+    trace::TraceLayer,
+};
 use utoipa::OpenApi;
 
 use crate::{
@@ -83,22 +92,25 @@ pub async fn build_app(pool: PgPool, config: Config) -> Router {
             rate_limiter_middleware,
         ));
 
-    let recorder_handle = PrometheusBuilder::new()
-        .install_recorder()
-        .expect("failed to install Prometheus recorder");
-
     Router::new()
+        .nest("/api/v1", api_v1_router)
+        .fallback(not_found)
         .route("/health", get(health_check))
         .route(
             "/metrics",
-            get(move || std::future::ready(recorder_handle.render())),
+            get(move || {
+                std::future::ready(
+                    PrometheusBuilder::new()
+                        .install_recorder()
+                        .expect("failed to install Prometheus recorder")
+                        .render(),
+                )
+            }),
         )
         .merge(
             utoipa_swagger_ui::SwaggerUi::new("/swagger-ui")
                 .url("/api-docs/openapi.json", openapi::ApiDoc::openapi()),
         )
-        .nest("/api/v1", api_v1_router)
-        .fallback(not_found)
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
@@ -110,6 +122,19 @@ pub async fn build_app(pool: PgPool, config: Config) -> Router {
                 .br(true)
                 .deflate(true)
                 .zstd(true),
+        )
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any) // ⚠️ allow all origins (change in production)
+                .allow_methods([
+                    Method::GET,
+                    Method::POST,
+                    Method::PUT,
+                    Method::DELETE,
+                    Method::OPTIONS,
+                ])
+                .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
+                .allow_credentials(true),
         )
         .with_state(state)
 }
