@@ -2,13 +2,14 @@ use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use validator::Validate;
 
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, ToSchema, Default)]
 pub enum SortOrder {
+    #[default]
     Asc,
     Desc,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone, Validate, ToSchema, IntoParams)]
+#[derive(Debug, Deserialize, Serialize, Clone, Validate, ToSchema, IntoParams, Default)]
 pub struct PaginationQuery {
     #[validate(range(min = 1))]
     pub page: Option<u32>,

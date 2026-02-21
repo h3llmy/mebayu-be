@@ -151,3 +151,155 @@ impl UserRepository for UserRepositoryImpl {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::infrastructure::database::migrations::run_migrations;
+    use chrono::Utc;
+    use sqlx::{Pool, Postgres};
+    use uuid::Uuid;
+
+    async fn setup_db(pool: &Pool<Postgres>) {
+        run_migrations(pool).await;
+    }
+
+    fn sample_user(role: UserRole) -> User {
+        User {
+            id: Uuid::new_v4(),
+            username: format!("user_{}", Uuid::new_v4()),
+            email: format!("user_{}@test.com", Uuid::new_v4()),
+            password_hash: "hashed_password".to_string(),
+            role: role.to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[sqlx::test]
+    async fn test_create_and_find_by_id(pool: Pool<Postgres>) {
+        setup_db(&pool).await;
+        let repo = UserRepositoryImpl::new(pool.clone());
+
+        let user = sample_user(UserRole::User);
+
+        let created = repo.create(&user).await.unwrap();
+        assert_eq!(created.username, user.username);
+
+        let found = repo.find_by_id(user.id).await.unwrap();
+        assert_eq!(found.id, user.id);
+        assert_eq!(found.email, user.email);
+    }
+
+    #[sqlx::test]
+    async fn test_find_by_id_not_found(pool: Pool<Postgres>) {
+        setup_db(&pool).await;
+        let repo = UserRepositoryImpl::new(pool.clone());
+
+        let result = repo.find_by_id(Uuid::new_v4()).await;
+        assert!(matches!(result, Err(AppError::NotFound(_))));
+    }
+
+    #[sqlx::test]
+    async fn test_find_by_username(pool: Pool<Postgres>) {
+        setup_db(&pool).await;
+        let repo = UserRepositoryImpl::new(pool.clone());
+
+        let user = sample_user(UserRole::User);
+        repo.create(&user).await.unwrap();
+
+        let found = repo.find_by_username(&user.username).await.unwrap();
+        assert_eq!(found.id, user.id);
+    }
+
+    #[sqlx::test]
+    async fn test_find_all(pool: Pool<Postgres>) {
+        setup_db(&pool).await;
+        let repo = UserRepositoryImpl::new(pool.clone());
+
+        for _ in 0..3 {
+            repo.create(&sample_user(UserRole::User)).await.unwrap();
+        }
+
+        let query = PaginationQuery {
+            page: Some(1),
+            limit: Some(10),
+            search: None,
+            sort: None,
+            sort_order: None,
+        };
+
+        let (users, total) = repo.find_all(&query).await.unwrap();
+
+        assert_eq!(total, 3);
+        assert_eq!(users.len(), 3);
+    }
+
+    #[sqlx::test]
+    async fn test_find_all_pagination(pool: Pool<Postgres>) {
+        setup_db(&pool).await;
+        let repo = UserRepositoryImpl::new(pool.clone());
+
+        for _ in 0..5 {
+            repo.create(&sample_user(UserRole::User)).await.unwrap();
+        }
+
+        let query = PaginationQuery {
+            page: Some(2),
+            limit: Some(2),
+            search: None,
+            sort: None,
+            sort_order: None,
+        };
+
+        let (users, total) = repo.find_all(&query).await.unwrap();
+
+        assert_eq!(total, 5);
+        assert_eq!(users.len(), 2);
+    }
+
+    #[sqlx::test]
+    async fn test_is_admin_exists(pool: Pool<Postgres>) {
+        setup_db(&pool).await;
+        let repo = UserRepositoryImpl::new(pool.clone());
+
+        // Initially no admin
+        let exists = repo.is_admin_exists().await.unwrap();
+        assert!(!exists);
+
+        // Insert admin
+        repo.create(&sample_user(UserRole::Admin)).await.unwrap();
+
+        let exists_after = repo.is_admin_exists().await.unwrap();
+        assert!(exists_after);
+    }
+
+    #[sqlx::test]
+    async fn test_update(pool: Pool<Postgres>) {
+        setup_db(&pool).await;
+        let repo = UserRepositoryImpl::new(pool.clone());
+
+        let mut user = sample_user(UserRole::User);
+        repo.create(&user).await.unwrap();
+
+        user.username = "updated_username".to_string();
+        user.updated_at = Utc::now();
+
+        let updated = repo.update(user.id, &user).await.unwrap();
+        assert_eq!(updated.username, "updated_username");
+    }
+
+    #[sqlx::test]
+    async fn test_delete(pool: Pool<Postgres>) {
+        setup_db(&pool).await;
+        let repo = UserRepositoryImpl::new(pool.clone());
+
+        let user = sample_user(UserRole::User);
+        repo.create(&user).await.unwrap();
+
+        repo.delete(user.id).await.unwrap();
+
+        let result = repo.find_by_id(user.id).await;
+        assert!(matches!(result, Err(AppError::NotFound(_))));
+    }
+}

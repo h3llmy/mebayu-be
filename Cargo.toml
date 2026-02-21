@@ -30,3 +30,6 @@ utoipa-axum = "0.2.0"
 utoipa = { version = "5.4.0", features = ["uuid", "chrono"] }
 aws-config = { version = "1", features = ["behavior-version-latest"] }
 aws-sdk-s3 = "1"
+
+[dev-dependencies]
+mockall = "0.13.1"

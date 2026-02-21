@@ -416,3 +416,170 @@ impl ProductRepository for ProductRepositoryImpl {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::infrastructure::database::migrations::run_migrations;
+    use chrono::Utc;
+
+    async fn setup_db(pool: &PgPool) {
+        run_migrations(pool).await;
+    }
+
+    async fn seed_category(pool: &PgPool) -> ProductCategory {
+        let category = ProductCategory {
+            id: Uuid::new_v4(),
+            name: "Category 1".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        sqlx::query!(
+            "INSERT INTO product_categories (id,name,created_at,updated_at)
+             VALUES ($1,$2,$3,$4)",
+            category.id,
+            category.name,
+            category.created_at,
+            category.updated_at
+        )
+        .execute(pool)
+        .await
+        .unwrap();
+
+        category
+    }
+
+    async fn seed_material(pool: &PgPool) -> ProductMaterial {
+        let material = ProductMaterial {
+            id: Uuid::new_v4(),
+            name: "Material 1".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        sqlx::query!(
+            "INSERT INTO product_materials (id,name,created_at,updated_at)
+             VALUES ($1,$2,$3,$4)",
+            material.id,
+            material.name,
+            material.created_at,
+            material.updated_at
+        )
+        .execute(pool)
+        .await
+        .unwrap();
+
+        material
+    }
+
+    fn sample_product(category_id: Uuid, material_id: Uuid) -> Product {
+        Product {
+            id: Uuid::new_v4(),
+            name: "Product 1".to_string(),
+            price: 100.0,
+            description: "Test product".to_string(),
+            status: "ACTIVE".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            category_ids: vec![category_id],
+            material_ids: vec![material_id],
+            categories: vec![],
+            product_materials: vec![],
+            images: vec![],
+        }
+    }
+
+    #[sqlx::test]
+    async fn test_create_and_find_by_id(pool: PgPool) {
+        setup_db(&pool).await;
+        let repo = ProductRepositoryImpl::new(pool.clone());
+
+        let category = seed_category(&pool).await;
+        let material = seed_material(&pool).await;
+
+        let product = sample_product(category.id, material.id);
+
+        let created = repo.create(&product).await.unwrap();
+        assert_eq!(created.name, "Product 1");
+
+        let found = repo.find_by_id(product.id).await.unwrap();
+        assert_eq!(found.id, product.id);
+        assert_eq!(found.category_ids.len(), 1);
+        assert_eq!(found.material_ids.len(), 1);
+    }
+
+    #[sqlx::test]
+    async fn test_create_without_category_should_fail(pool: PgPool) {
+        setup_db(&pool).await;
+        let repo = ProductRepositoryImpl::new(pool.clone());
+
+        let mut product = sample_product(Uuid::new_v4(), Uuid::new_v4());
+        product.category_ids = vec![];
+
+        let result = repo.create(&product).await;
+        assert!(matches!(result, Err(AppError::Validation(_))));
+    }
+
+    #[sqlx::test]
+    async fn test_find_all(pool: PgPool) {
+        setup_db(&pool).await;
+        let repo = ProductRepositoryImpl::new(pool.clone());
+
+        let category = seed_category(&pool).await;
+        let material = seed_material(&pool).await;
+
+        for _ in 0..3 {
+            let product = sample_product(category.id, material.id);
+            repo.create(&product).await.unwrap();
+        }
+
+        let query = PaginationQuery {
+            page: Some(1),
+            search: None,
+            limit: Some(10),
+            sort: None,
+            sort_order: None,
+        };
+
+        let (items, total) = repo.find_all(&query).await.unwrap();
+
+        assert_eq!(total, 3);
+        assert_eq!(items.len(), 3);
+    }
+
+    #[sqlx::test]
+    async fn test_update(pool: PgPool) {
+        setup_db(&pool).await;
+        let repo = ProductRepositoryImpl::new(pool.clone());
+
+        let category = seed_category(&pool).await;
+        let material = seed_material(&pool).await;
+
+        let mut product = sample_product(category.id, material.id);
+        repo.create(&product).await.unwrap();
+
+        product.name = "Updated Product".to_string();
+        product.updated_at = Utc::now();
+
+        let updated = repo.update(product.id, &product).await.unwrap();
+        assert_eq!(updated.name, "Updated Product");
+    }
+
+    #[sqlx::test]
+    async fn test_delete(pool: PgPool) {
+        setup_db(&pool).await;
+        let repo = ProductRepositoryImpl::new(pool.clone());
+
+        let category = seed_category(&pool).await;
+        let material = seed_material(&pool).await;
+
+        let product = sample_product(category.id, material.id);
+        repo.create(&product).await.unwrap();
+
+        repo.delete(product.id).await.unwrap();
+
+        let result = repo.find_by_id(product.id).await;
+        assert!(matches!(result, Err(AppError::NotFound(_))));
+    }
+}

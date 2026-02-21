@@ -1,7 +1,7 @@
 use std::env;
 use tracing_subscriber::{filter::EnvFilter, prelude::*};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Config {
     pub host: String,
     pub port: String,

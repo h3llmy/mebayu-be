@@ -6,8 +6,22 @@ use aws_sdk_s3::{
 use std::time::Duration;
 use uuid::Uuid;
 
-use crate::{core::config::Config, shared::dto::object_storage::GetUploadUrlRequest};
-use crate::{core::error::AppError, shared::dto::object_storage::GetUploadUrlResponse};
+use crate::{
+    core::{config::Config, error::AppError},
+    shared::dto::object_storage::{GetUploadUrlRequest, GetUploadUrlResponse},
+};
+
+#[cfg_attr(test, mockall::automock)]
+#[async_trait::async_trait]
+pub trait Storage: Send + Sync {
+    async fn generate_upload_url(
+        &self,
+        req: GetUploadUrlRequest,
+        expires_in: Duration,
+    ) -> Result<Vec<GetUploadUrlResponse>, AppError>;
+
+    async fn validate_object(&self, url: &str) -> Result<(), AppError>;
+}
 
 pub struct S3Service {
     client: Client,
@@ -15,37 +29,9 @@ pub struct S3Service {
     public_url: String,
 }
 
-impl S3Service {
-    pub async fn new(config: &Config) -> Self {
-        let credentials = Credentials::new(
-            config.s3_access_key.clone(),
-            config.s3_secret_key.clone(),
-            None,
-            None,
-            "minio",
-        );
-
-        let base_config = aws_config::defaults(BehaviorVersion::latest())
-            .region(Region::new(config.s3_region.clone()))
-            .credentials_provider(SharedCredentialsProvider::new(credentials))
-            .endpoint_url(config.s3_endpoint.clone())
-            .load()
-            .await;
-
-        let s3_config = S3ConfigBuilder::from(&base_config)
-            .force_path_style(true)
-            .build();
-
-        let client = Client::from_conf(s3_config);
-
-        Self {
-            client,
-            bucket: config.s3_bucket.clone(),
-            public_url: config.s3_endpoint.clone(),
-        }
-    }
-
-    pub async fn generate_upload_url(
+#[async_trait::async_trait]
+impl Storage for S3Service {
+    async fn generate_upload_url(
         &self,
         req: GetUploadUrlRequest,
         expires_in: Duration,
@@ -53,7 +39,6 @@ impl S3Service {
         let mut results = Vec::new();
 
         for file in req.metadata {
-            // extract extension
             let extension = std::path::Path::new(&file.file_name)
                 .extension()
                 .and_then(|ext| ext.to_str())
@@ -93,8 +78,8 @@ impl S3Service {
         Ok(results)
     }
 
-    pub async fn validate_object(&self, url: &str) -> Result<(), AppError> {
-        let key = self.extract_key(url).map_err(|e| {
+    async fn validate_object(&self, url: &str) -> Result<(), AppError> {
+        let key = Self::extract_key(&self.bucket, url).map_err(|e| {
             AppError::Validation(
                 vec![("image_urls".to_string(), vec![e])]
                     .into_iter()
@@ -121,16 +106,152 @@ impl S3Service {
 
         Ok(())
     }
+}
 
-    fn extract_key(&self, url: &str) -> Result<String, String> {
-        // Expected format: http://.../bucket/key
-        // For MinIO/S3 with path style: http://host:port/bucket/key
+impl S3Service {
+    pub async fn new(config: &Config) -> Self {
+        let credentials = Credentials::new(
+            config.s3_access_key.clone(),
+            config.s3_secret_key.clone(),
+            None,
+            None,
+            "minio",
+        );
 
-        let bucket_part = format!("/{}/", self.bucket);
+        let base_config = aws_config::defaults(BehaviorVersion::latest())
+            .region(Region::new(config.s3_region.clone()))
+            .credentials_provider(SharedCredentialsProvider::new(credentials))
+            .endpoint_url(config.s3_endpoint.clone())
+            .load()
+            .await;
+
+        let s3_config = S3ConfigBuilder::from(&base_config)
+            .force_path_style(true)
+            .build();
+
+        let client = Client::from_conf(s3_config);
+
+        Self {
+            client,
+            bucket: config.s3_bucket.clone(),
+            public_url: config.s3_endpoint.clone(),
+        }
+    }
+
+    /// Pure helper — fully unit testable
+    fn extract_key(bucket: &str, url: &str) -> Result<String, String> {
+        let bucket_part = format!("/{}/", bucket);
+
         if let Some(pos) = url.find(&bucket_part) {
             Ok(url[pos + bucket_part.len()..].to_string())
         } else {
             Err("Invalid storage URL format".to_string())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shared::dto::object_storage::FileUploadMetadata;
+    use mockall::predicate::*;
+    use std::time::Duration;
+
+    // -------------------------
+    // extract_key tests
+    // -------------------------
+
+    #[test]
+    fn test_extract_key_success() {
+        let bucket = "my-bucket";
+        let url = "http://localhost:9000/my-bucket/uploads/test.png";
+
+        let key = S3Service::extract_key(bucket, url).unwrap();
+
+        assert_eq!(key, "uploads/test.png");
+    }
+
+    #[test]
+    fn test_extract_key_invalid_format() {
+        let bucket = "my-bucket";
+        let url = "http://localhost:9000/wrong-bucket/test.png";
+
+        let result = S3Service::extract_key(bucket, url);
+
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Invalid storage URL format");
+    }
+
+    // -------------------------
+    // Storage trait mocking tests
+    // -------------------------
+
+    #[tokio::test]
+    async fn test_validate_object_success_mocked() {
+        let mut mock = MockStorage::new();
+
+        mock.expect_validate_object()
+            .with(eq("http://localhost:9000/my-bucket/uploads/test.png"))
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let result = mock
+            .validate_object("http://localhost:9000/my-bucket/uploads/test.png")
+            .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_validate_object_failure_mocked() {
+        let mut mock = MockStorage::new();
+
+        mock.expect_validate_object().returning(|url| {
+            Err(AppError::Validation(
+                vec![(
+                    "image_urls".to_string(),
+                    vec![format!("File not found in storage: {}", url)],
+                )]
+                .into_iter()
+                .collect(),
+            ))
+        });
+
+        let result = mock
+            .validate_object("http://localhost:9000/my-bucket/uploads/test.png")
+            .await;
+
+        assert!(matches!(result, Err(AppError::Validation(_))));
+    }
+
+    #[tokio::test]
+    async fn test_generate_upload_url_mocked() {
+        let mut mock = MockStorage::new();
+
+        let request = GetUploadUrlRequest {
+            path: "uploads".to_string(),
+            metadata: vec![FileUploadMetadata {
+                file_name: "image.png".to_string(),
+                content_type: "image/png".to_string(),
+            }],
+        };
+
+        mock.expect_generate_upload_url()
+            .times(1)
+            .returning(|req, _| {
+                Ok(vec![GetUploadUrlResponse {
+                    file_key: format!("{}/test.png", req.path),
+                    public_url: "http://localhost:9000/my-bucket/uploads/test.png".to_string(),
+                    upload_url: "http://presigned-url".to_string(),
+                }])
+            });
+
+        let result = mock
+            .generate_upload_url(request, Duration::from_secs(300))
+            .await
+            .unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert!(result[0].upload_url.contains("http"));
     }
 }

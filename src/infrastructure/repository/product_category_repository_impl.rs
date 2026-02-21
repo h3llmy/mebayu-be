@@ -136,3 +136,175 @@ impl ProductCategoryRepository for ProductCategoryRepositoryImpl {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::infrastructure::database::migrations::run_migrations;
+
+    use super::*;
+    use chrono::Utc;
+    use sqlx::PgPool;
+    use uuid::Uuid;
+
+    async fn setup_db(pool: &PgPool) {
+        run_migrations(pool).await;
+    }
+
+    fn sample_category(name: &str) -> ProductCategory {
+        ProductCategory {
+            id: Uuid::new_v4(),
+            name: name.to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[sqlx::test]
+    async fn test_create_and_find_by_id(pool: PgPool) {
+        setup_db(&pool).await;
+        let repo = ProductCategoryRepositoryImpl::new(pool.clone());
+
+        let category = sample_category("Electronics");
+
+        let created = repo.create(&category).await.unwrap();
+        assert_eq!(created.name, "Electronics");
+
+        let found = repo.find_by_id(category.id).await.unwrap();
+        assert_eq!(found.id, category.id);
+        assert_eq!(found.name, "Electronics");
+    }
+
+    #[sqlx::test]
+    async fn test_find_by_id_not_found(pool: PgPool) {
+        setup_db(&pool).await;
+        let repo = ProductCategoryRepositoryImpl::new(pool.clone());
+
+        let result = repo.find_by_id(Uuid::new_v4()).await;
+        assert!(result.is_err());
+    }
+
+    #[sqlx::test]
+    async fn test_find_all(pool: PgPool) {
+        setup_db(&pool).await;
+        let repo = ProductCategoryRepositoryImpl::new(pool.clone());
+
+        for i in 0..3 {
+            repo.create(&sample_category(&format!("Category {}", i)))
+                .await
+                .unwrap();
+        }
+
+        let query = PaginationQuery {
+            page: Some(1),
+            search: None,
+            limit: Some(10),
+            sort: None,
+            sort_order: None,
+        };
+
+        let (items, total) = repo.find_all(&query).await.unwrap();
+
+        assert_eq!(total, 3);
+        assert_eq!(items.len(), 3);
+    }
+
+    #[sqlx::test]
+    async fn test_find_all_pagination(pool: PgPool) {
+        setup_db(&pool).await;
+        let repo = ProductCategoryRepositoryImpl::new(pool.clone());
+
+        for i in 0..5 {
+            repo.create(&sample_category(&format!("Category {}", i)))
+                .await
+                .unwrap();
+        }
+
+        let query = PaginationQuery {
+            page: Some(2),
+            search: None,
+            limit: Some(2),
+            sort: None,
+            sort_order: None,
+        };
+
+        let (items, total) = repo.find_all(&query).await.unwrap();
+
+        assert_eq!(total, 5);
+        assert_eq!(items.len(), 2);
+    }
+
+    #[sqlx::test]
+    async fn test_find_all_with_product_count(pool: PgPool) {
+        setup_db(&pool).await;
+        let repo = ProductCategoryRepositoryImpl::new(pool.clone());
+
+        for i in 0..4 {
+            repo.create(&sample_category(&format!("Category {}", i)))
+                .await
+                .unwrap();
+        }
+
+        let query = PaginationQuery {
+            page: Some(1),
+            search: None,
+            limit: Some(10),
+            sort: None,
+            sort_order: None,
+        };
+
+        let (items, total) = repo.find_all_with_product_count(&query).await.unwrap();
+
+        assert_eq!(total, 4);
+        assert_eq!(items.len(), 4);
+    }
+
+    #[sqlx::test]
+    async fn test_update(pool: PgPool) {
+        setup_db(&pool).await;
+        let repo = ProductCategoryRepositoryImpl::new(pool.clone());
+
+        let mut category = sample_category("Old Name");
+        repo.create(&category).await.unwrap();
+
+        category.name = "New Name".to_string();
+        category.updated_at = Utc::now();
+
+        let updated = repo.update(category.id, &category).await.unwrap();
+        assert_eq!(updated.name, "New Name");
+    }
+
+    #[sqlx::test]
+    async fn test_update_not_found(pool: PgPool) {
+        setup_db(&pool).await;
+        let repo = ProductCategoryRepositoryImpl::new(pool.clone());
+
+        let category = sample_category("Does Not Exist");
+
+        let result = repo.update(Uuid::new_v4(), &category).await;
+        assert!(result.is_err());
+    }
+
+    #[sqlx::test]
+    async fn test_delete(pool: PgPool) {
+        setup_db(&pool).await;
+        let repo = ProductCategoryRepositoryImpl::new(pool.clone());
+
+        let category = sample_category("DeleteMe");
+        repo.create(&category).await.unwrap();
+
+        repo.delete(category.id).await.unwrap();
+
+        let result = repo.find_by_id(category.id).await;
+        assert!(result.is_err());
+    }
+
+    #[sqlx::test]
+    async fn test_delete_non_existing(pool: PgPool) {
+        setup_db(&pool).await;
+        let repo = ProductCategoryRepositoryImpl::new(pool.clone());
+
+        let result = repo.delete(Uuid::new_v4()).await;
+        assert!(result.is_ok());
+        // DELETE doesn't error if row doesn't exist in Postgres
+    }
+}
