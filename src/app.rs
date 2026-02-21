@@ -133,8 +133,7 @@ pub async fn build_app(pool: PgPool, config: Config) -> Router {
                     Method::DELETE,
                     Method::OPTIONS,
                 ])
-                .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
-                .allow_credentials(true),
+                .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]),
         )
         .with_state(state)
 }
