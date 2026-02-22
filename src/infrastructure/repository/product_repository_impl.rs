@@ -93,7 +93,7 @@ impl ProductRepository for ProductRepositoryImpl {
             "#,
             if search.is_some() {
                 "WHERE p.name ILIKE $3
-                   OR p.material ILIKE $3
+                   OR pm.name ILIKE $3
                    OR p.description ILIKE $3"
             } else {
                 ""
