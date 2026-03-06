@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::{
     core::error::AppError,
     domain::product_materials::{entity::ProductMaterial, service::ProductMaterialRepository},
-    shared::dto::pagination::PaginationQuery,
+    shared::dto::pagination::{PaginationQuery, SortOrder},
 };
 
 pub struct ProductMaterialRepositoryImpl {
@@ -27,6 +27,20 @@ impl ProductMaterialRepository for ProductMaterialRepositoryImpl {
         let limit = query.get_limit() as i64;
         let offset = query.get_offset();
 
+        let search = query.get_search().map(|s| format!("%{}%", s));
+
+        let allowed_sort_fields = ["name", "created_at", "updated_at"];
+
+        let sort_field = query
+            .get_sort()
+            .filter(|field| allowed_sort_fields.contains(&field.as_str()))
+            .unwrap_or_else(|| "created_at".to_string());
+
+        let sort_order = match query.get_sort_order() {
+            Some(SortOrder::Asc) => "ASC",
+            _ => "DESC",
+        };
+
         #[derive(sqlx::FromRow)]
         struct ProductMaterialWithCount {
             #[sqlx(flatten)]
@@ -34,16 +48,25 @@ impl ProductMaterialRepository for ProductMaterialRepositoryImpl {
             total_count: i64,
         }
 
-        let rows = sqlx::query_as::<_, ProductMaterialWithCount>(
+        let rows = sqlx::query_as::<_, ProductMaterialWithCount>(&format!(
             r#"
             SELECT *, COUNT(*) OVER() as total_count
             FROM product_materials
-            ORDER BY created_at DESC
+            {}
+            ORDER BY {} {}
             LIMIT $1 OFFSET $2
             "#,
-        )
+            if search.is_some() {
+                "WHERE name ILIKE $3"
+            } else {
+                ""
+            },
+            sort_field,
+            sort_order
+        ))
         .bind(limit)
         .bind(offset)
+        .bind(search)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| AppError::Database(e.to_string()))?;
@@ -247,5 +270,40 @@ mod tests {
         let result = repo.delete(Uuid::new_v4()).await;
         assert!(result.is_ok());
         // Postgres DELETE does not error if row does not exist
+    }
+
+    #[sqlx::test]
+    async fn test_find_all_search_and_sort(pool: PgPool) {
+        setup_db(&pool).await;
+        let repo = ProductMaterialRepositoryImpl::new(pool.clone());
+
+        repo.create(&sample_material("Steel")).await.unwrap();
+        repo.create(&sample_material("Wood")).await.unwrap();
+        repo.create(&sample_material("Plastic")).await.unwrap();
+
+        // Test search
+        let query = PaginationQuery {
+            page: Some(1),
+            search: Some("ee".to_string()), // Should match "Steel"
+            limit: Some(10),
+            sort: None,
+            sort_order: None,
+        };
+        let (items, total) = repo.find_all(&query).await.unwrap();
+        assert_eq!(total, 1);
+        assert_eq!(items[0].name, "Steel");
+
+        // Test sort by name ASC
+        let query_sort = PaginationQuery {
+            page: Some(1),
+            search: None,
+            limit: Some(10),
+            sort: Some("name".to_string()),
+            sort_order: Some(SortOrder::Asc),
+        };
+        let (items, _) = repo.find_all(&query_sort).await.unwrap();
+        assert_eq!(items[0].name, "Plastic");
+        assert_eq!(items[1].name, "Steel");
+        assert_eq!(items[2].name, "Wood");
     }
 }

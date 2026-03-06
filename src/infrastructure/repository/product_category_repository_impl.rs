@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::{
     core::error::AppError,
     domain::product_categories::{entity::ProductCategory, service::ProductCategoryRepository},
-    shared::dto::pagination::PaginationQuery,
+    shared::dto::pagination::{PaginationQuery, SortOrder},
 };
 
 pub struct ProductCategoryRepositoryImpl {
@@ -27,6 +27,20 @@ impl ProductCategoryRepository for ProductCategoryRepositoryImpl {
         let limit = query.get_limit() as i64;
         let offset = query.get_offset();
 
+        let search = query.get_search().map(|s| format!("%{}%", s));
+
+        let allowed_sort_fields = ["name", "created_at", "updated_at"];
+
+        let sort_field = query
+            .get_sort()
+            .filter(|field| allowed_sort_fields.contains(&field.as_str()))
+            .unwrap_or_else(|| "created_at".to_string());
+
+        let sort_order = match query.get_sort_order() {
+            Some(SortOrder::Asc) => "ASC",
+            _ => "DESC",
+        };
+
         #[derive(sqlx::FromRow)]
         struct ProductCategoryWithCount {
             #[sqlx(flatten)]
@@ -34,16 +48,25 @@ impl ProductCategoryRepository for ProductCategoryRepositoryImpl {
             total_count: i64,
         }
 
-        let rows = sqlx::query_as::<_, ProductCategoryWithCount>(
+        let rows = sqlx::query_as::<_, ProductCategoryWithCount>(&format!(
             r#"
             SELECT *, COUNT(*) OVER() as total_count
             FROM product_categories
-            ORDER BY created_at DESC
+            {}
+            ORDER BY {} {}
             LIMIT $1 OFFSET $2
             "#,
-        )
+            if search.is_some() {
+                "WHERE name ILIKE $3"
+            } else {
+                ""
+            },
+            sort_field,
+            sort_order
+        ))
         .bind(limit)
         .bind(offset)
+        .bind(search)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| AppError::Database(e.to_string()))?;
@@ -61,6 +84,20 @@ impl ProductCategoryRepository for ProductCategoryRepositoryImpl {
         let limit = query.get_limit() as i64;
         let offset = query.get_offset();
 
+        let search = query.get_search().map(|s| format!("%{}%", s));
+
+        let allowed_sort_fields = ["name", "created_at", "updated_at"];
+
+        let sort_field = query
+            .get_sort()
+            .filter(|field| allowed_sort_fields.contains(&field.as_str()))
+            .unwrap_or_else(|| "created_at".to_string());
+
+        let sort_order = match query.get_sort_order() {
+            Some(SortOrder::Asc) => "ASC",
+            _ => "DESC",
+        };
+
         #[derive(sqlx::FromRow)]
         struct ProductCategoryWithCount {
             #[sqlx(flatten)]
@@ -68,16 +105,25 @@ impl ProductCategoryRepository for ProductCategoryRepositoryImpl {
             total_count: i64,
         }
 
-        let rows = sqlx::query_as::<_, ProductCategoryWithCount>(
+        let rows = sqlx::query_as::<_, ProductCategoryWithCount>(&format!(
             r#"
             SELECT *, COUNT(*) OVER() as total_count
             FROM product_categories
-            ORDER BY created_at DESC
+            {}
+            ORDER BY {} {}
             LIMIT $1 OFFSET $2
             "#,
-        )
+            if search.is_some() {
+                "WHERE name ILIKE $3"
+            } else {
+                ""
+            },
+            sort_field,
+            sort_order
+        ))
         .bind(limit)
         .bind(offset)
+        .bind(search)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| AppError::Database(e.to_string()))?;
@@ -306,5 +352,40 @@ mod tests {
         let result = repo.delete(Uuid::new_v4()).await;
         assert!(result.is_ok());
         // DELETE doesn't error if row doesn't exist in Postgres
+    }
+
+    #[sqlx::test]
+    async fn test_find_all_search_and_sort(pool: PgPool) {
+        setup_db(&pool).await;
+        let repo = ProductCategoryRepositoryImpl::new(pool.clone());
+
+        repo.create(&sample_category("Electronics")).await.unwrap();
+        repo.create(&sample_category("Books")).await.unwrap();
+        repo.create(&sample_category("Clothing")).await.unwrap();
+
+        // Test search
+        let query = PaginationQuery {
+            page: Some(1),
+            search: Some("tron".to_string()), // Should match "Electronics"
+            limit: Some(10),
+            sort: None,
+            sort_order: None,
+        };
+        let (items, total) = repo.find_all(&query).await.unwrap();
+        assert_eq!(total, 1);
+        assert_eq!(items[0].name, "Electronics");
+
+        // Test sort by name ASC
+        let query_sort = PaginationQuery {
+            page: Some(1),
+            search: None,
+            limit: Some(10),
+            sort: Some("name".to_string()),
+            sort_order: Some(SortOrder::Asc),
+        };
+        let (items, _) = repo.find_all(&query_sort).await.unwrap();
+        assert_eq!(items[0].name, "Books");
+        assert_eq!(items[1].name, "Clothing");
+        assert_eq!(items[2].name, "Electronics");
     }
 }
