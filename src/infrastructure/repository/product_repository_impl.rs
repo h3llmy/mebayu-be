@@ -293,7 +293,7 @@ impl ProductRepository for ProductRepositoryImpl {
         // 5. Insert image relations
         for image in &product.images {
             sqlx::query(
-                "INSERT INTO product_images (id, product_id, image_url, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)",
+                "INSERT INTO product_images (id, product_id, url, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)",
             )
             .bind(image.id)
             .bind(product.id)
@@ -388,7 +388,7 @@ impl ProductRepository for ProductRepositoryImpl {
         // Add new
         for image in &product.images {
             sqlx::query(
-                "INSERT INTO product_images (id, product_id, url, is_primary, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)",
+                "INSERT INTO product_images (id, product_id, url, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)",
             )
             .bind(image.id)
             .bind(id)
