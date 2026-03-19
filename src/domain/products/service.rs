@@ -4,9 +4,9 @@ use uuid::Uuid;
 
 use crate::{
     core::error::AppError,
-    domain::products::dto::{CreateProductRequest, UpdateProductRequest},
+    domain::products::dto::{CreateProductRequest, UpdateProductRequest, GetProductsQuery},
     infrastructure::object_storage::s3::Storage,
-    shared::dto::{pagination::PaginationQuery, response::PaginationResponse},
+    shared::dto::response::PaginationResponse,
 };
 
 use super::entity::{Product, ProductImage};
@@ -14,7 +14,7 @@ use super::entity::{Product, ProductImage};
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait ProductRepository: Send + Sync {
-    async fn find_all(&self, query: &PaginationQuery) -> Result<(Vec<Product>, u64), AppError>;
+    async fn find_all(&self, query: &GetProductsQuery) -> Result<(Vec<Product>, u64), AppError>;
     async fn find_by_id(&self, id: Uuid) -> Result<Product, AppError>;
     async fn create(&self, product: &Product) -> Result<Product, AppError>;
     async fn update(&self, id: Uuid, product: &Product) -> Result<Product, AppError>;
@@ -36,15 +36,15 @@ impl ProductServiceImpl {
 
     pub async fn get_all(
         &self,
-        query: &PaginationQuery,
+        query: &GetProductsQuery,
     ) -> Result<PaginationResponse<Vec<Product>>, AppError> {
         let (products, total_data) = self.repository.find_all(query).await?;
-        let limit = query.get_limit();
+        let limit = query.pagination.get_limit();
         let total_page = (total_data as f64 / limit as f64).ceil() as u64;
 
         Ok(PaginationResponse {
             data: products,
-            page: query.get_page(),
+            page: query.pagination.get_page(),
             limit,
             total_data,
             total_page,
@@ -181,7 +181,7 @@ mod tests {
     async fn test_get_all() {
         let mut mock_repo = MockProductRepository::new();
         let mock_s3 = MockStorage::new();
-        let query = PaginationQuery::default();
+        let query = GetProductsQuery::default();
         let total_data = 1;
         let products = vec![Product {
             id: Uuid::new_v4(),

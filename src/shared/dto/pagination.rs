@@ -12,15 +12,15 @@ pub enum SortOrder {
 #[derive(Debug, Deserialize, Serialize, Clone, Validate, ToSchema, IntoParams, Default)]
 #[into_params(parameter_in = Query)] // Explicitly set the location to Query string
 pub struct PaginationQuery {
-    #[param(inline)] // Helps with nested Enums like SortOrder
     pub page: Option<u32>,
-
+ 
     pub limit: Option<u32>,
-
+ 
     pub search: Option<String>,
-
+ 
     pub sort: Option<String>,
-
+ 
+    #[param(inline)]
     pub sort_order: Option<SortOrder>,
 }
 

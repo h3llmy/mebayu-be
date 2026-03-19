@@ -13,7 +13,7 @@ use crate::{
     },
     domain::{
         products::{
-            dto::{CreateProductRequest, UpdateProductRequest},
+            dto::{CreateProductRequest, UpdateProductRequest, GetProductsQuery},
             entity::Product,
         },
         users::entity::UserRole,
@@ -39,7 +39,9 @@ pub fn product_routes() -> Router<Arc<AppState>> {
     operation_id = "list_products",
     path = "/api/v1/products",
     params(
-        PaginationQuery
+        PaginationQuery,
+        ("category_id" = Option<Uuid>, Query, description = "Filter by category ID"),
+        ("material_id" = Option<Uuid>, Query, description = "Filter by material ID"),
     ),
     responses(
         (status = 200, description = "List all products", body = PaginationResponse<Vec<Product>>),
@@ -47,7 +49,7 @@ pub fn product_routes() -> Router<Arc<AppState>> {
 )]
 pub async fn get_all(
     State(state): State<Arc<AppState>>,
-    ValidatedQuery(query): ValidatedQuery<PaginationQuery>,
+    ValidatedQuery(query): ValidatedQuery<GetProductsQuery>,
 ) -> Result<Json<PaginationResponse<Vec<Product>>>, AppError> {
     let response = state.product_service.get_all(&query).await?;
     Ok(Json(response))
