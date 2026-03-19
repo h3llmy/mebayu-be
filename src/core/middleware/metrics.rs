@@ -41,13 +41,22 @@ pub async fn track_metrics(mut req: Request, next: Next) -> Response<Body> {
 
     let labels = [
         ("method", method.to_string()),
-        ("path", path),
+        ("path", path.clone()),
         ("status", status),
-        ("request_id", request_id),
+        ("request_id", request_id.clone()),
     ];
 
     metrics::counter!("http_requests_total", &labels).increment(1);
     metrics::histogram!("http_request_duration_seconds", &labels).record(latency);
+
+    tracing::info!(
+        method = %method,
+        path = %path,
+        status = %response.status().as_u16(),
+        latency = ?start.elapsed(),
+        request_id = %request_id,
+        "HTTP Request"
+    );
 
     response
 }

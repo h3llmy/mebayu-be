@@ -15,7 +15,7 @@ uuid = { version = "1.21.0", features = ["v4", "serde"] }
 async-trait = "0.1.89"
 redis = { version = "1.0.4", features = ["tokio-comp", "json"] }
 tower = "0.5.3"
-tower-http = { version = "0.6.8", features = ["cors", "trace", "compression-full"] }
+tower-http = { version = "0.6.8", features = ["cors", "trace", "compression-full", "catch-panic"] }
 validator = { version = "0.20.0", features = ["derive"] }
 serde_path_to_error = "0.1.20"
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }

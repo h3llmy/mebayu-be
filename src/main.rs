@@ -5,8 +5,6 @@ mod infrastructure;
 mod presentation;
 mod shared;
 
-use infrastructure::database::{connection::create_pool, migrations::run_migrations};
-
 use crate::core::config::Config;
 
 #[tokio::main]
@@ -16,12 +14,7 @@ async fn main() {
     let config = Config::from_env();
     Config::logger_setup();
 
-    let pool = create_pool(&config.database_url)
-        .await
-        .expect("Database initialization failed");
-    run_migrations(&pool).await;
-
-    let app = app::build_app(pool, config.clone()).await;
+    let app = app::build_app(config.clone()).await;
     let addr = format!("{}:{}", config.host, config.port);
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();

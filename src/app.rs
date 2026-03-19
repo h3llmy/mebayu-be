@@ -7,12 +7,12 @@ use axum::{
     routing::get,
 };
 use metrics_exporter_prometheus::PrometheusBuilder;
-use sqlx::PgPool;
 use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer,
     cors::{Any, CorsLayer},
     trace::TraceLayer,
+    catch_panic::CatchPanicLayer,
 };
 use utoipa::OpenApi;
 
@@ -28,7 +28,9 @@ use crate::{
         products::service::ProductServiceImpl, users::service::UserServiceImpl,
     },
     infrastructure::{
-        database::redis::create_redis_client,
+        database::{
+            connection::create_pool, migrations::run_migrations, redis::create_redis_client,
+        },
         object_storage::s3::S3Service,
         repository::{
             product_category_repository_impl::ProductCategoryRepositoryImpl,
@@ -49,7 +51,12 @@ async fn health_check() -> Result<String, AppError> {
     Ok("OK".to_string())
 }
 
-pub async fn build_app(pool: PgPool, config: Config) -> Router {
+pub async fn build_app(config: Config) -> Router {
+    let pool = create_pool(&config.database_url)
+        .await
+        .expect("Database initialization failed");
+    run_migrations(&pool).await;
+
     let redis_client = create_redis_client(&config.redis_url);
 
     let product_repo = Arc::new(ProductRepositoryImpl::new(pool.clone()));
@@ -113,7 +120,16 @@ pub async fn build_app(pool: PgPool, config: Config) -> Router {
         )
         .layer(
             ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
+                .layer(
+                    TraceLayer::new_for_http()
+                        .make_span_with(
+                            tower_http::trace::DefaultMakeSpan::new().level(tracing::Level::INFO),
+                        )
+                        .on_response(
+                            tower_http::trace::DefaultOnResponse::new().level(tracing::Level::INFO),
+                        ),
+                )
+                .layer(CatchPanicLayer::new())
                 .layer(middleware::from_fn(metrics::track_metrics)),
         )
         .layer(
