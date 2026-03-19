@@ -24,6 +24,7 @@ use utoipa::{
         product_controller::get_all,
         product_controller::create,
         product_controller::get_by_id,
+        product_controller::get_recommendations,
         product_controller::update,
         product_controller::delete,
         product_category_controller::get_all,

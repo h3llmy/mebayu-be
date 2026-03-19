@@ -259,6 +259,105 @@ impl ProductRepository for ProductRepositoryImpl {
         })
     }
 
+    async fn find_recommendations(&self, id: Uuid, limit: i64) -> Result<Vec<Product>, AppError> {
+        let sql = r#"
+            SELECT
+                p.*,
+
+                COALESCE(
+                    JSON_AGG(DISTINCT pc.*)
+                    FILTER (WHERE pc.id IS NOT NULL),
+                    '[]'
+                ) as categories,
+
+                COALESCE(
+                    JSON_AGG(DISTINCT pm.*)
+                    FILTER (WHERE pm.id IS NOT NULL),
+                    '[]'
+                ) as materials,
+
+                COALESCE(
+                    JSON_AGG(DISTINCT pi.*)
+                    FILTER (WHERE pi.id IS NOT NULL),
+                    '[]'
+                ) as images,
+
+                COUNT(DISTINCT pcr2.category_id) + COUNT(DISTINCT pmr2.material_id) AS overlap_score
+
+            FROM products p
+
+            LEFT JOIN product_category_relations pcr ON p.id = pcr.product_id
+            LEFT JOIN product_categories pc ON pcr.category_id = pc.id
+
+            LEFT JOIN product_material_relations pmr ON p.id = pmr.product_id
+            LEFT JOIN product_materials pm ON pmr.material_id = pm.id
+
+            LEFT JOIN product_images pi ON p.id = pi.product_id
+
+            -- join to find shared categories
+            LEFT JOIN product_category_relations pcr2
+                ON pcr2.product_id = p.id
+                AND pcr2.category_id IN (
+                    SELECT category_id FROM product_category_relations WHERE product_id = $1
+                )
+
+            -- join to find shared materials
+            LEFT JOIN product_material_relations pmr2
+                ON pmr2.product_id = p.id
+                AND pmr2.material_id IN (
+                    SELECT material_id FROM product_material_relations WHERE product_id = $1
+                )
+
+            WHERE p.id != $1
+              AND (
+                    pcr2.category_id IS NOT NULL
+                 OR pmr2.material_id IS NOT NULL
+              )
+
+            GROUP BY p.id
+            ORDER BY overlap_score DESC, p.created_at DESC
+            LIMIT $2
+        "#;
+
+        let rows = sqlx::query(sql)
+            .bind(id)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| AppError::Database(e.to_string()))?;
+
+        let products = rows
+            .into_iter()
+            .map(|r| {
+                let categories: Vec<crate::domain::product_categories::entity::ProductCategory> =
+                    serde_json::from_value(r.get("categories")).unwrap_or_default();
+
+                let materials: Vec<crate::domain::product_materials::entity::ProductMaterial> =
+                    serde_json::from_value(r.get("materials")).unwrap_or_default();
+
+                let images: Vec<ProductImage> =
+                    serde_json::from_value(r.get("images")).unwrap_or_default();
+
+                Product {
+                    id: r.get("id"),
+                    name: r.get("name"),
+                    price: r.get("price"),
+                    description: r.get("description"),
+                    status: r.get("status"),
+                    created_at: r.get("created_at"),
+                    updated_at: r.get("updated_at"),
+                    category_ids: categories.iter().map(|c| c.id).collect(),
+                    material_ids: materials.iter().map(|m| m.id).collect(),
+                    categories,
+                    product_materials: materials,
+                    images,
+                }
+            })
+            .collect();
+
+        Ok(products)
+    }
+
     async fn create(&self, product: &Product) -> Result<Product, AppError> {
         let mut tx = self
             .pool

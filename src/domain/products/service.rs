@@ -16,6 +16,7 @@ use super::entity::{Product, ProductImage};
 pub trait ProductRepository: Send + Sync {
     async fn find_all(&self, query: &GetProductsQuery) -> Result<(Vec<Product>, u64), AppError>;
     async fn find_by_id(&self, id: Uuid) -> Result<Product, AppError>;
+    async fn find_recommendations(&self, id: Uuid, limit: i64) -> Result<Vec<Product>, AppError>;
     async fn create(&self, product: &Product) -> Result<Product, AppError>;
     async fn update(&self, id: Uuid, product: &Product) -> Result<Product, AppError>;
     async fn delete(&self, id: Uuid) -> Result<(), AppError>;
@@ -128,6 +129,17 @@ impl ProductServiceImpl {
         };
 
         self.repository.update(id, &product).await
+    }
+
+    pub async fn get_recommendations(
+        &self,
+        id: Uuid,
+        limit: Option<i64>,
+    ) -> Result<Vec<Product>, AppError> {
+        // make sure the product exists first
+        self.repository.find_by_id(id).await?;
+        let limit = limit.unwrap_or(8).min(50).max(1);
+        self.repository.find_recommendations(id, limit).await
     }
 
     pub async fn delete(&self, id: Uuid) -> Result<(), AppError> {

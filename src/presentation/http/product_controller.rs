@@ -1,8 +1,9 @@
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     routing::get,
 };
+use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{
@@ -32,6 +33,7 @@ pub fn product_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(get_all).post(create))
         .route("/{id}", get(get_by_id).put(update).delete(delete))
+        .route("/{id}/recommendations", get(get_recommendations))
 }
 
 #[utoipa::path(
@@ -155,4 +157,34 @@ pub async fn delete(
     auth_user.require_role(&[UserRole::Admin])?;
     state.product_service.delete(*id).await?;
     Ok(Json(ApiResponse { data: () }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RecommendationsQuery {
+    pub limit: Option<i64>,
+}
+
+#[utoipa::path(
+    get,
+    operation_id = "get_product_recommendations",
+    path = "/api/v1/products/{id}/recommendations",
+    params(
+        ("id" = Uuid, Path, description = "Product ID"),
+        ("limit" = Option<i64>, Query, description = "Max number of recommendations to return (default 8, max 50)")
+    ),
+    responses(
+        (status = 200, description = "Product recommendations", body = ApiResponse<Vec<Product>>),
+        (status = 404, description = "Product not found", body = ErrorResponse)
+    )
+)]
+pub async fn get_recommendations(
+    State(state): State<Arc<AppState>>,
+    id: Path<Uuid>,
+    Query(query): Query<RecommendationsQuery>,
+) -> Result<Json<ApiResponse<Vec<Product>>>, AppError> {
+    let products = state
+        .product_service
+        .get_recommendations(*id, query.limit)
+        .await?;
+    Ok(Json(ApiResponse { data: products }))
 }
