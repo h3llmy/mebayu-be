@@ -10,18 +10,35 @@ pub enum SortOrder {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, Validate, ToSchema, IntoParams, Default)]
-#[into_params(parameter_in = Query)] // Explicitly set the location to Query string
+#[into_params(parameter_in = Query)]
 pub struct PaginationQuery {
+    #[serde(default, deserialize_with = "deserialize_option_number_from_string")]
     pub page: Option<u32>,
- 
+
+    #[serde(default, deserialize_with = "deserialize_option_number_from_string")]
     pub limit: Option<u32>,
- 
+
     pub search: Option<String>,
- 
+
     pub sort: Option<String>,
- 
+
     #[param(inline)]
     pub sort_order: Option<SortOrder>,
+}
+
+pub fn deserialize_option_number_from_string<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    T: std::str::FromStr,
+    T::Err: std::fmt::Display,
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let opt = Option::<String>::deserialize(deserializer)?;
+    match opt {
+        Some(s) if s.is_empty() => Ok(None),
+        Some(s) => s.parse().map(Some).map_err(serde::de::Error::custom),
+        None => Ok(None),
+    }
 }
 
 impl PaginationQuery {
