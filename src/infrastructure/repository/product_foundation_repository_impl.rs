@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::{
     core::error::AppError,
     domain::product_foundations::{entity::ProductFoundation, service::ProductFoundationRepository},
-    shared::dto::pagination::PaginationQuery,
+    shared::dto::pagination::{PaginationQuery, SortOrder},
 };
 
 pub struct ProductFoundationRepositoryImpl {
@@ -24,35 +24,54 @@ impl ProductFoundationRepository for ProductFoundationRepositoryImpl {
         &self,
         query: &PaginationQuery,
     ) -> Result<(Vec<ProductFoundation>, u64), AppError> {
-        let limit = query.get_limit();
+        let limit = query.get_limit() as i64;
         let offset = query.get_offset();
-        let search = query.search.as_deref().unwrap_or("");
+        let search = query.get_search().map(|s| format!("%{}%", s));
 
-        let foundations = sqlx::query_as!(
-            ProductFoundation,
+        let allowed_sort_fields = ["name", "created_at", "updated_at"];
+
+        let sort_field = query
+            .get_sort()
+            .filter(|field| allowed_sort_fields.contains(&field.as_str()))
+            .unwrap_or_else(|| "created_at".to_string());
+
+        let sort_order = match query.get_sort_order() {
+            Some(SortOrder::Asc) => "ASC",
+            _ => "DESC",
+        };
+
+        #[derive(sqlx::FromRow)]
+        struct ProductFoundationWithCount {
+            #[sqlx(flatten)]
+            foundation: ProductFoundation,
+            total_count: i64,
+        }
+
+        let rows = sqlx::query_as::<_, ProductFoundationWithCount>(&format!(
             r#"
-            SELECT * FROM product_foundations 
-            WHERE name ILIKE $1
-            ORDER BY created_at DESC
-            LIMIT $2 OFFSET $3
+            SELECT *, COUNT(*) OVER() as total_count
+            FROM product_foundations
+            {}
+            ORDER BY {} {}
+            LIMIT $1 OFFSET $2
             "#,
-            format!("%{}%", search),
-            limit as i64,
-            offset as i64
-        )
+            if search.is_some() {
+                "WHERE name ILIKE $3"
+            } else {
+                ""
+            },
+            sort_field,
+            sort_order
+        ))
+        .bind(limit)
+        .bind(offset)
+        .bind(search)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| AppError::Database(e.to_string()))?;
 
-        let total = sqlx::query!(
-            "SELECT count(*) FROM product_foundations WHERE name ILIKE $1",
-            format!("%{}%", search)
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| AppError::Database(e.to_string()))?
-        .count
-        .unwrap_or(0);
+        let total = rows.first().map(|r| r.total_count).unwrap_or(0);
+        let foundations = rows.into_iter().map(|r| r.foundation).collect();
 
         Ok((foundations, total as u64))
     }
@@ -121,5 +140,82 @@ impl ProductFoundationRepository for ProductFoundationRepositoryImpl {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::infrastructure::database::migrations::run_migrations;
+
+    use super::*;
+    use chrono::Utc;
+    use sqlx::PgPool;
+    use uuid::Uuid;
+
+    fn sample_foundation(name: &str) -> ProductFoundation {
+        ProductFoundation {
+            id: Uuid::new_v4(),
+            name: name.to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[sqlx::test]
+    async fn test_create_and_find_by_id(pool: PgPool) {
+        run_migrations(&pool).await;
+        let repo = ProductFoundationRepositoryImpl::new(pool.clone());
+        let foundation = sample_foundation("Foundation A");
+
+        let created = repo.create(&foundation).await.unwrap();
+        assert_eq!(created.name, "Foundation A");
+
+        let found = repo.find_by_id(foundation.id).await.unwrap();
+        assert_eq!(found.id, foundation.id);
+        assert_eq!(found.name, "Foundation A");
+    }
+
+    #[sqlx::test]
+    async fn test_find_all_sort_by_name_asc(pool: PgPool) {
+        run_migrations(&pool).await;
+        let repo = ProductFoundationRepositoryImpl::new(pool.clone());
+        
+        repo.create(&sample_foundation("C")).await.unwrap();
+        repo.create(&sample_foundation("A")).await.unwrap();
+        repo.create(&sample_foundation("B")).await.unwrap();
+
+        let query = PaginationQuery {
+            sort: Some("name".to_string()),
+            sort_order: Some(SortOrder::Asc),
+            ..Default::default()
+        };
+
+        let (items, total) = repo.find_all(&query).await.unwrap();
+        assert_eq!(total, 3);
+        assert_eq!(items[0].name, "A");
+        assert_eq!(items[1].name, "B");
+        assert_eq!(items[2].name, "C");
+    }
+    
+    #[sqlx::test]
+    async fn test_find_all_sort_by_name_desc(pool: PgPool) {
+        run_migrations(&pool).await;
+        let repo = ProductFoundationRepositoryImpl::new(pool.clone());
+        
+        repo.create(&sample_foundation("C")).await.unwrap();
+        repo.create(&sample_foundation("A")).await.unwrap();
+        repo.create(&sample_foundation("B")).await.unwrap();
+
+        let query = PaginationQuery {
+            sort: Some("name".to_string()),
+            sort_order: Some(SortOrder::Desc),
+            ..Default::default()
+        };
+
+        let (items, total) = repo.find_all(&query).await.unwrap();
+        assert_eq!(total, 3);
+        assert_eq!(items[0].name, "C");
+        assert_eq!(items[1].name, "B");
+        assert_eq!(items[2].name, "A");
     }
 }
