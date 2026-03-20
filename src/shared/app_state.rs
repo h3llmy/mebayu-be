@@ -5,6 +5,7 @@ use crate::{
     domain::{
         auth::service::AuthService, product_categories::service::ProductCategoryServiceImpl,
         product_materials::service::ProductMaterialServiceImpl,
+        product_foundations::service::ProductFoundationServiceImpl,
         products::service::ProductServiceImpl, users::service::UserServiceImpl,
     },
     infrastructure::object_storage::s3::S3Service,
@@ -15,6 +16,7 @@ pub struct AppState {
     pub product_service: Arc<ProductServiceImpl>,
     pub product_category_service: Arc<ProductCategoryServiceImpl>,
     pub product_material_service: Arc<ProductMaterialServiceImpl>,
+    pub product_foundation_service: Arc<ProductFoundationServiceImpl>,
     pub user_service: Arc<UserServiceImpl>,
     pub auth_service: Arc<AuthService>,
     pub redis_client: redis::Client,

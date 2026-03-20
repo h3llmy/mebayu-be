@@ -12,6 +12,9 @@ pub struct CreateProductRequest {
     pub material_ids: Vec<Uuid>,
 
     #[validate(length(min = 1))]
+    pub foundation_ids: Vec<Uuid>,
+
+    #[validate(length(min = 1))]
     pub name: String,
 
     #[validate(range(min = 0.01))]

@@ -8,6 +8,7 @@ use crate::{
     core::error::AppError,
     domain::{
         product_categories::entity::ProductCategory,
+        product_foundations::entity::ProductFoundation,
         product_materials::entity::ProductMaterial,
         products::{
             dto::GetProductsQuery,
@@ -54,8 +55,8 @@ impl ProductRepository for ProductRepositoryImpl {
 
         if search.is_some() {
             where_clauses.push(format!(
-                "(p.name ILIKE ${} OR pm.name ILIKE ${} OR p.description ILIKE ${})",
-                param_index, param_index, param_index
+                "(p.name ILIKE ${} OR pm.name ILIKE ${} OR pf.name ILIKE ${} OR p.description ILIKE ${})",
+                param_index, param_index, param_index, param_index
             ));
             param_index += 1;
         }
@@ -71,6 +72,14 @@ impl ProductRepository for ProductRepositoryImpl {
         if query.material_id.is_some() {
             where_clauses.push(format!(
                 "EXISTS (SELECT 1 FROM product_material_relations WHERE product_id = p.id AND material_id = ${})",
+                param_index
+            ));
+            param_index += 1;
+        }
+
+        if query.foundation_id.is_some() {
+            where_clauses.push(format!(
+                "EXISTS (SELECT 1 FROM product_foundation_relations WHERE product_id = p.id AND foundation_id = ${})",
                 param_index
             ));
             // param_index += 1;
@@ -101,6 +110,12 @@ impl ProductRepository for ProductRepositoryImpl {
                 ) as materials,
 
                 COALESCE(
+                    JSON_AGG(DISTINCT pf.*)
+                    FILTER (WHERE pf.id IS NOT NULL),
+                    '[]'
+                ) as foundations,
+
+                COALESCE(
                     JSON_AGG(DISTINCT pi.*)
                     FILTER (WHERE pi.id IS NOT NULL),
                     '[]'
@@ -117,6 +132,11 @@ impl ProductRepository for ProductRepositoryImpl {
                 ON p.id = pmr.product_id
             LEFT JOIN product_materials pm
                 ON pmr.material_id = pm.id
+
+            LEFT JOIN product_foundation_relations pfr
+                ON p.id = pfr.product_id
+            LEFT JOIN product_foundations pf
+                ON pfr.foundation_id = pf.id
 
             LEFT JOIN product_images pi
                 ON p.id = pi.product_id
@@ -143,6 +163,10 @@ impl ProductRepository for ProductRepositoryImpl {
             sql_query = sql_query.bind(mid);
         }
 
+        if let Some(fid) = query.foundation_id {
+            sql_query = sql_query.bind(fid);
+        }
+
         let rows = sql_query
             .fetch_all(&self.pool)
             .await
@@ -163,6 +187,9 @@ impl ProductRepository for ProductRepositoryImpl {
                 let materials: Vec<ProductMaterial> =
                     serde_json::from_value(r.get("materials")).unwrap_or_default();
 
+                let foundations: Vec<ProductFoundation> =
+                    serde_json::from_value(r.get("foundations")).unwrap_or_default();
+
                 let images: Vec<ProductImage> =
                     serde_json::from_value(r.get("images")).unwrap_or_default();
 
@@ -176,7 +203,9 @@ impl ProductRepository for ProductRepositoryImpl {
                     updated_at: r.get("updated_at"),
                     category_ids: categories.iter().map(|c| c.id).collect(),
                     material_ids: materials.iter().map(|m| m.id).collect(),
+                    foundation_ids: foundations.iter().map(|f| f.id).collect(),
                     categories,
+                    product_foundations: foundations,
                     product_materials: materials,
                     images,
                 }
@@ -205,6 +234,12 @@ impl ProductRepository for ProductRepositoryImpl {
             ) as "product_materials!: serde_json::Value",
 
             COALESCE(
+                json_agg(DISTINCT pf) 
+                FILTER (WHERE pf.id IS NOT NULL),
+                '[]'
+            ) as "product_foundations!: serde_json::Value",
+
+            COALESCE(
                 json_agg(DISTINCT pi) 
                 FILTER (WHERE pi.id IS NOT NULL),
                 '[]'
@@ -221,6 +256,11 @@ impl ProductRepository for ProductRepositoryImpl {
             ON p.id = pmr.product_id
         LEFT JOIN product_materials pm 
             ON pmr.material_id = pm.id
+
+        LEFT JOIN product_foundation_relations pfr 
+            ON p.id = pfr.product_id
+        LEFT JOIN product_foundations pf 
+            ON pfr.foundation_id = pf.id
 
         LEFT JOIN product_images pi 
             ON p.id = pi.product_id
@@ -241,6 +281,9 @@ impl ProductRepository for ProductRepositoryImpl {
         let product_materials: Vec<ProductMaterial> =
             serde_json::from_value(row.product_materials).unwrap_or_default();
 
+        let product_foundations: Vec<ProductFoundation> =
+            serde_json::from_value(row.product_foundations).unwrap_or_default();
+
         let images: Vec<ProductImage> = serde_json::from_value(row.images).unwrap_or_default();
 
         Ok(Product {
@@ -253,7 +296,9 @@ impl ProductRepository for ProductRepositoryImpl {
             updated_at: row.updated_at,
             category_ids: categories.iter().map(|c| c.id).collect(),
             material_ids: product_materials.iter().map(|m| m.id).collect(),
+            foundation_ids: product_foundations.iter().map(|f| f.id).collect(),
             categories,
+            product_foundations,
             product_materials,
             images,
         })
@@ -277,12 +322,18 @@ impl ProductRepository for ProductRepositoryImpl {
                 ) as materials,
 
                 COALESCE(
+                    JSON_AGG(DISTINCT pf.*)
+                    FILTER (WHERE pf.id IS NOT NULL),
+                    '[]'
+                ) as foundations,
+
+                COALESCE(
                     JSON_AGG(DISTINCT pi.*)
                     FILTER (WHERE pi.id IS NOT NULL),
                     '[]'
                 ) as images,
 
-                COUNT(DISTINCT pcr2.category_id) + COUNT(DISTINCT pmr2.material_id) AS overlap_score
+                COUNT(DISTINCT pcr2.category_id) + COUNT(DISTINCT pmr2.material_id) + COUNT(DISTINCT pfr2.foundation_id) AS overlap_score
 
             FROM products p
 
@@ -291,6 +342,9 @@ impl ProductRepository for ProductRepositoryImpl {
 
             LEFT JOIN product_material_relations pmr ON p.id = pmr.product_id
             LEFT JOIN product_materials pm ON pmr.material_id = pm.id
+
+            LEFT JOIN product_foundation_relations pfr ON p.id = pfr.product_id
+            LEFT JOIN product_foundations pf ON pfr.foundation_id = pf.id
 
             LEFT JOIN product_images pi ON p.id = pi.product_id
 
@@ -308,10 +362,18 @@ impl ProductRepository for ProductRepositoryImpl {
                     SELECT material_id FROM product_material_relations WHERE product_id = $1
                 )
 
+            -- join to find shared foundations
+            LEFT JOIN product_foundation_relations pfr2
+                ON pfr2.product_id = p.id
+                AND pfr2.foundation_id IN (
+                    SELECT foundation_id FROM product_foundation_relations WHERE product_id = $1
+                )
+
             WHERE p.id != $1
               AND (
                     pcr2.category_id IS NOT NULL
                  OR pmr2.material_id IS NOT NULL
+                 OR pfr2.foundation_id IS NOT NULL
               )
 
             GROUP BY p.id
@@ -335,6 +397,9 @@ impl ProductRepository for ProductRepositoryImpl {
                 let materials: Vec<crate::domain::product_materials::entity::ProductMaterial> =
                     serde_json::from_value(r.get("materials")).unwrap_or_default();
 
+                let foundations: Vec<crate::domain::product_foundations::entity::ProductFoundation> =
+                    serde_json::from_value(r.get("foundations")).unwrap_or_default();
+
                 let images: Vec<ProductImage> =
                     serde_json::from_value(r.get("images")).unwrap_or_default();
 
@@ -348,7 +413,9 @@ impl ProductRepository for ProductRepositoryImpl {
                     updated_at: r.get("updated_at"),
                     category_ids: categories.iter().map(|c| c.id).collect(),
                     material_ids: materials.iter().map(|m| m.id).collect(),
+                    foundation_ids: foundations.iter().map(|f| f.id).collect(),
                     categories,
+                    product_foundations: foundations,
                     product_materials: materials,
                     images,
                 }
@@ -429,7 +496,19 @@ impl ProductRepository for ProductRepositoryImpl {
             .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
         }
 
-        // 5. Insert image relations
+        // 5. Insert foundation relations
+        for foundation_id in &product.foundation_ids {
+            sqlx::query!(
+                "INSERT INTO product_foundation_relations (product_id, foundation_id) VALUES ($1, $2)",
+                product.id,
+                foundation_id
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+        }
+
+        // 6. Insert image relations
         for image in &product.images {
             sqlx::query(
                 "INSERT INTO product_images (id, product_id, url, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)",
@@ -516,7 +595,29 @@ impl ProductRepository for ProductRepositoryImpl {
             .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
         }
 
-        // 4. Update image relations
+        // 4. Update foundation relations
+        // Clear existing
+        sqlx::query!(
+            "DELETE FROM product_foundation_relations WHERE product_id = $1",
+            id
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+
+        // Add new
+        for foundation_id in &product.foundation_ids {
+            sqlx::query!(
+                "INSERT INTO product_foundation_relations (product_id, foundation_id) VALUES ($1, $2)",
+                id,
+                foundation_id
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+        }
+
+        // 5. Update image relations
         // Clear existing
         sqlx::query("DELETE FROM product_images WHERE product_id = $1")
             .bind(id)
@@ -615,7 +716,30 @@ mod tests {
         material
     }
 
-    fn sample_product(category_id: Uuid, material_id: Uuid) -> Product {
+    async fn seed_foundation(pool: &PgPool) -> ProductFoundation {
+        let foundation = ProductFoundation {
+            id: Uuid::new_v4(),
+            name: "Foundation 1".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        sqlx::query!(
+            "INSERT INTO product_foundations (id,name,created_at,updated_at)
+             VALUES ($1,$2,$3,$4)",
+            foundation.id,
+            foundation.name,
+            foundation.created_at,
+            foundation.updated_at
+        )
+        .execute(pool)
+        .await
+        .unwrap();
+
+        foundation
+    }
+
+    fn sample_product(category_id: Uuid, material_id: Uuid, foundation_id: Uuid) -> Product {
         Product {
             id: Uuid::new_v4(),
             name: "Product 1".to_string(),
@@ -626,8 +750,10 @@ mod tests {
             updated_at: Utc::now(),
             category_ids: vec![category_id],
             material_ids: vec![material_id],
+            foundation_ids: vec![foundation_id],
             categories: vec![],
             product_materials: vec![],
+            product_foundations: vec![],
             images: vec![],
         }
     }
@@ -639,8 +765,9 @@ mod tests {
 
         let category = seed_category(&pool).await;
         let material = seed_material(&pool).await;
+        let foundation = seed_foundation(&pool).await;
 
-        let product = sample_product(category.id, material.id);
+        let product = sample_product(category.id, material.id, foundation.id);
 
         let created = repo.create(&product).await.unwrap();
         assert_eq!(created.name, "Product 1");
@@ -649,6 +776,7 @@ mod tests {
         assert_eq!(found.id, product.id);
         assert_eq!(found.category_ids.len(), 1);
         assert_eq!(found.material_ids.len(), 1);
+        assert_eq!(found.foundation_ids.len(), 1);
     }
 
     #[sqlx::test]
@@ -656,7 +784,7 @@ mod tests {
         setup_db(&pool).await;
         let repo = ProductRepositoryImpl::new(pool.clone());
 
-        let mut product = sample_product(Uuid::new_v4(), Uuid::new_v4());
+        let mut product = sample_product(Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
         product.category_ids = vec![];
 
         let result = repo.create(&product).await;
@@ -670,9 +798,10 @@ mod tests {
 
         let category = seed_category(&pool).await;
         let material = seed_material(&pool).await;
+        let foundation = seed_foundation(&pool).await;
 
         for _ in 0..3 {
-            let product = sample_product(category.id, material.id);
+            let product = sample_product(category.id, material.id, foundation.id);
             repo.create(&product).await.unwrap();
         }
 
@@ -686,6 +815,7 @@ mod tests {
             },
             category_id: None,
             material_id: None,
+            foundation_id: None,
         };
 
         let (items, total) = repo.find_all(&query).await.unwrap();
@@ -701,8 +831,9 @@ mod tests {
 
         let category = seed_category(&pool).await;
         let material = seed_material(&pool).await;
+        let foundation = seed_foundation(&pool).await;
 
-        let mut product = sample_product(category.id, material.id);
+        let mut product = sample_product(category.id, material.id, foundation.id);
         repo.create(&product).await.unwrap();
 
         product.name = "Updated Product".to_string();
@@ -719,8 +850,9 @@ mod tests {
 
         let category = seed_category(&pool).await;
         let material = seed_material(&pool).await;
+        let foundation = seed_foundation(&pool).await;
 
-        let product = sample_product(category.id, material.id);
+        let product = sample_product(category.id, material.id, foundation.id);
         repo.create(&product).await.unwrap();
 
         repo.delete(product.id).await.unwrap();

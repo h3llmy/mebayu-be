@@ -5,6 +5,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::domain::product_categories::entity::ProductCategory;
+use crate::domain::product_foundations::entity::ProductFoundation;
 use crate::domain::product_materials::entity::ProductMaterial;
 
 #[derive(Clone, Serialize, Deserialize, FromRow, ToSchema)]
@@ -23,8 +24,14 @@ pub struct Product {
     #[sqlx(skip)]
     pub material_ids: Vec<Uuid>,
     #[serde(skip_deserializing)]
+    #[sqlx(skip)]
+    pub foundation_ids: Vec<Uuid>,
+    #[serde(skip_deserializing)]
     #[sqlx(default)]
     pub categories: Vec<ProductCategory>,
+    #[serde(skip_deserializing)]
+    #[sqlx(default)]
+    pub product_foundations: Vec<ProductFoundation>,
     #[serde(skip_deserializing)]
     #[sqlx(default)]
     pub product_materials: Vec<ProductMaterial>,

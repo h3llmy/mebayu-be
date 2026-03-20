@@ -12,4 +12,6 @@ pub struct GetProductsQuery {
     pub category_id: Option<Uuid>,
 
     pub material_id: Option<Uuid>,
+
+    pub foundation_id: Option<Uuid>,
 }

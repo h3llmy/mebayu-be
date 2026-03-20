@@ -2,7 +2,10 @@ use crate::{
     core::error::ErrorResponse,
     domain::{
         auth::dto::*, product_categories::dto::*, product_categories::entity::*,
-        product_materials::dto::*, product_materials::entity::*, products::dto::*,
+        product_materials::dto::*, product_materials::entity::*, 
+        product_foundations::dto::*,
+        product_foundations::entity::*,
+        products::dto::*,
         products::entity::*, users::dto::*, users::entity::*,
     },
     presentation::http::*,
@@ -38,6 +41,11 @@ use utoipa::{
         product_material_controller::get_by_id,
         product_material_controller::update,
         product_material_controller::delete,
+        product_foundation_controller::get_all,
+        product_foundation_controller::create,
+        product_foundation_controller::get_by_id,
+        product_foundation_controller::update,
+        product_foundation_controller::delete,
         storage_controller::get_presign_url,
         user_controller::get_all,
         user_controller::get_by_id,
@@ -51,10 +59,11 @@ use utoipa::{
             CreateProductRequest, UpdateProductRequest, GetUploadUrlRequest, GetUploadUrlResponse, Product, ProductImage,
             CreateProductCategoryRequest, UpdateProductCategoryRequest, ProductCategory,
             CreateProductMaterialRequest, UpdateProductMaterialRequest, ProductMaterial,
+            ProductFoundation, CreateProductFoundationRequest, UpdateProductFoundationRequest,
             CreateUserDto, UpdateUserDto, UserResponseDto, UserRole,
             PaginationQuery, SortOrder, ErrorResponse,
-            ApiResponse<Product>, ApiResponse<UserResponseDto>, ApiResponse<ProductCategory>, ApiResponse<ProductMaterial>, ApiResponse<GetUploadUrlResponse>,
-            PaginationResponse<Vec<Product>>, PaginationResponse<Vec<ProductCategory>>, PaginationResponse<Vec<ProductMaterial>>, PaginationResponse<Vec<UserResponseDto>>
+            ApiResponse<Product>, ApiResponse<UserResponseDto>, ApiResponse<ProductCategory>, ApiResponse<ProductMaterial>, ApiResponse<ProductFoundation>, ApiResponse<GetUploadUrlResponse>,
+            PaginationResponse<Vec<Product>>, PaginationResponse<Vec<ProductCategory>>, PaginationResponse<Vec<ProductMaterial>>, PaginationResponse<Vec<ProductFoundation>>, PaginationResponse<Vec<UserResponseDto>>
         )
     ),
     modifiers(&SecurityAddon),

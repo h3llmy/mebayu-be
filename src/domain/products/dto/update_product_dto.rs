@@ -12,6 +12,9 @@ pub struct UpdateProductRequest {
     pub material_ids: Option<Vec<Uuid>>,
 
     #[validate(length(min = 1))]
+    pub foundation_ids: Option<Vec<Uuid>>,
+
+    #[validate(length(min = 1))]
     pub name: Option<String>,
 
     #[validate(range(min = 0.0))]

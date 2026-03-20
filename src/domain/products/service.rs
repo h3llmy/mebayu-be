@@ -67,6 +67,7 @@ impl ProductServiceImpl {
             id,
             category_ids: req.category_ids,
             material_ids: req.material_ids,
+            foundation_ids: req.foundation_ids,
             name: req.name,
             price: req.price,
             description: req.description,
@@ -75,6 +76,7 @@ impl ProductServiceImpl {
             updated_at: chrono::Utc::now(),
             categories: vec![],
             product_materials: vec![],
+            product_foundations: vec![],
             images: req
                 .image_urls
                 .into_iter()
@@ -104,6 +106,7 @@ impl ProductServiceImpl {
             id,
             category_ids: req.category_ids.unwrap_or(product.category_ids),
             material_ids: req.material_ids.unwrap_or(product.material_ids),
+            foundation_ids: req.foundation_ids.unwrap_or(product.foundation_ids),
             name: req.name.unwrap_or(product.name),
             price: req.price.unwrap_or(product.price),
             description: req.description.unwrap_or(product.description),
@@ -112,6 +115,7 @@ impl ProductServiceImpl {
             updated_at: chrono::Utc::now(),
             categories: vec![],
             product_materials: vec![],
+            product_foundations: vec![],
             images: req
                 .image_urls
                 .map(|urls| {
@@ -170,8 +174,10 @@ mod tests {
             updated_at: Utc::now(),
             category_ids: vec![],
             material_ids: vec![],
+            foundation_ids: vec![],
             categories: vec![],
             product_materials: vec![],
+            product_foundations: vec![],
             images: vec![],
         };
 
@@ -205,8 +211,10 @@ mod tests {
             updated_at: Utc::now(),
             category_ids: vec![],
             material_ids: vec![],
+            foundation_ids: vec![],
             categories: vec![],
             product_materials: vec![],
+            product_foundations: vec![],
             images: vec![],
         }];
 
@@ -234,6 +242,7 @@ mod tests {
             status: "active".to_string(),
             category_ids: vec![Uuid::new_v4()],
             material_ids: vec![Uuid::new_v4()],
+            foundation_ids: vec![Uuid::new_v4()],
             image_urls: vec!["http://example.com/image.png".to_string()],
         };
 
@@ -266,6 +275,7 @@ mod tests {
             status: "active".to_string(),
             category_ids: vec![Uuid::new_v4()],
             material_ids: vec![Uuid::new_v4()],
+            foundation_ids: vec![Uuid::new_v4()],
             image_urls: vec!["http://example.com/bad.png".to_string()],
         };
 

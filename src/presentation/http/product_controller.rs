@@ -44,6 +44,7 @@ pub fn product_routes() -> Router<Arc<AppState>> {
         PaginationQuery,
         ("category_id" = Option<Uuid>, Query, description = "Filter by category ID"),
         ("material_id" = Option<Uuid>, Query, description = "Filter by material ID"),
+        ("foundation_id" = Option<Uuid>, Query, description = "Filter by foundation ID"),
     ),
     responses(
         (status = 200, description = "List all products", body = PaginationResponse<Vec<Product>>),

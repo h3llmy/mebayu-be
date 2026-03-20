@@ -25,6 +25,7 @@ use crate::{
     domain::{
         auth::service::AuthService, product_categories::service::ProductCategoryServiceImpl,
         product_materials::service::ProductMaterialServiceImpl,
+        product_foundations::service::ProductFoundationServiceImpl,
         products::service::ProductServiceImpl, users::service::UserServiceImpl,
     },
     infrastructure::{
@@ -35,6 +36,7 @@ use crate::{
         repository::{
             product_category_repository_impl::ProductCategoryRepositoryImpl,
             product_material_repository_impl::ProductMaterialRepositoryImpl,
+            product_foundation_repository_impl::ProductFoundationRepositoryImpl,
             product_repository_impl::ProductRepositoryImpl,
             user_repository_impl::UserRepositoryImpl,
         },
@@ -62,12 +64,14 @@ pub async fn build_app(config: Config) -> Router {
     let product_repo = Arc::new(ProductRepositoryImpl::new(pool.clone()));
     let category_repo = Arc::new(ProductCategoryRepositoryImpl::new(pool.clone()));
     let material_repo = Arc::new(ProductMaterialRepositoryImpl::new(pool.clone()));
+    let foundation_repo = Arc::new(ProductFoundationRepositoryImpl::new(pool.clone()));
     let user_repo = Arc::new(UserRepositoryImpl::new(pool));
 
     let s3_service = Arc::new(S3Service::new(&config).await);
     let product_service = Arc::new(ProductServiceImpl::new(product_repo, s3_service.clone()));
     let product_category_service = Arc::new(ProductCategoryServiceImpl::new(category_repo));
     let product_material_service = Arc::new(ProductMaterialServiceImpl::new(material_repo));
+    let product_foundation_service = Arc::new(ProductFoundationServiceImpl::new(foundation_repo));
     let user_service = Arc::new(UserServiceImpl::new(user_repo.clone(), config.clone()));
     let auth_service = Arc::new(AuthService::new(
         user_service.clone(),
@@ -80,6 +84,7 @@ pub async fn build_app(config: Config) -> Router {
         product_service,
         product_category_service,
         product_material_service,
+        product_foundation_service,
         user_service,
         auth_service,
         redis_client,
@@ -92,6 +97,7 @@ pub async fn build_app(config: Config) -> Router {
         .nest("/products", product_routes())
         .nest("/product-categories", category_routes())
         .nest("/product-materials", product_material_routes())
+        .nest("/product-foundations", foundation_routes())
         .nest("/users", routes())
         .nest("/storages", storage_routes())
         .layer(middleware::from_fn_with_state(
