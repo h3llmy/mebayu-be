@@ -6,7 +6,9 @@ use crate::{
         product_foundations::dto::*,
         product_foundations::entity::*,
         products::dto::*,
-        products::entity::*, users::dto::*, users::entity::*,
+        products::entity::*, 
+        settings::dto::request::*, settings::entity::*,
+        users::dto::*, users::entity::*,
     },
     presentation::http::*,
     shared::dto::{object_storage::*, pagination::*, response::*},
@@ -52,6 +54,9 @@ use utoipa::{
         user_controller::create,
         user_controller::update,
         user_controller::delete_user,
+        setting_controller::get_setting,
+        setting_controller::update,
+        setting_controller::delete,
     ),
     components(
         schemas(
@@ -60,9 +65,11 @@ use utoipa::{
             CreateProductCategoryRequest, UpdateProductCategoryRequest, ProductCategory,
             CreateProductMaterialRequest, UpdateProductMaterialRequest, ProductMaterial,
             ProductFoundation, CreateProductFoundationRequest, UpdateProductFoundationRequest,
+            CreateSettingRequest, UpdateSettingRequest, Setting,
             CreateUserDto, UpdateUserDto, UserResponseDto, UserRole,
             PaginationQuery, SortOrder, ErrorResponse,
             ApiResponse<Product>, ApiResponse<UserResponseDto>, ApiResponse<ProductCategory>, ApiResponse<ProductMaterial>, ApiResponse<ProductFoundation>, ApiResponse<GetUploadUrlResponse>,
+            ApiResponse<Setting>,
             PaginationResponse<Vec<Product>>, PaginationResponse<Vec<ProductCategory>>, PaginationResponse<Vec<ProductMaterial>>, PaginationResponse<Vec<ProductFoundation>>, PaginationResponse<Vec<UserResponseDto>>
         )
     ),

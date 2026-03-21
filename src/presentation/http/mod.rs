@@ -6,6 +6,7 @@ pub mod user_controller;
 
 pub mod product_material_controller;
 pub mod product_foundation_controller;
+pub mod setting_controller;
 
 pub use auth_controller::*;
 pub use product_category_controller::*;
@@ -14,4 +15,5 @@ pub use product_material_controller::*;
 pub use product_foundation_controller::*;
 pub use storage_controller::*;
 pub use user_controller::*;
+pub use setting_controller::*;
 pub mod openapi;

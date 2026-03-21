@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT * FROM product_foundations \n            WHERE name ILIKE $1\n            ORDER BY created_at DESC\n            LIMIT $2 OFFSET $3\n            ",
+  "query": "SELECT * FROM hero_images WHERE setting_id = $1 ORDER BY order_index",
   "describe": {
     "columns": [
       {
@@ -10,33 +10,43 @@
       },
       {
         "ordinal": 1,
-        "name": "name",
-        "type_info": "Text"
+        "name": "setting_id",
+        "type_info": "Uuid"
       },
       {
         "ordinal": 2,
+        "name": "image_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "order_index",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 3,
+        "ordinal": 5,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
-        "Text",
-        "Int8",
-        "Int8"
+        "Uuid"
       ]
     },
     "nullable": [
       false,
       false,
       false,
+      false,
+      false,
       false
     ]
   },
-  "hash": "cdff6b6e234d52576c18523113d13153da8f36988a6dee34c0b47d2cf9c8715d"
+  "hash": "428e2c54656583a239eac93852194d74001b39fc09939edc38eb6e18c24009c6"
 }

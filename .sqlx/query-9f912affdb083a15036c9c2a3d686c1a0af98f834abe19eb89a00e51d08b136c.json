@@ -1,0 +1,57 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO hero_images (id, setting_id, image_url, order_index, created_at, updated_at)\n                VALUES ($1, $2, $3, $4, $5, $6)\n                RETURNING *\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "setting_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "image_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "order_index",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Int4",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9f912affdb083a15036c9c2a3d686c1a0af98f834abe19eb89a00e51d08b136c"
+}

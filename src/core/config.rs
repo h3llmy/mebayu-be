@@ -18,6 +18,9 @@ pub struct Config {
     pub admin_email: String,
     pub admin_username: String,
     pub admin_password: String,
+    pub default_setting_email: String,
+    pub default_setting_whatsapp: String,
+    pub default_setting_hero_images: Vec<String>,
 }
 
 impl Config {
@@ -60,6 +63,15 @@ impl Config {
                 .unwrap_or_else(|_| "admin@example.com".to_string()),
             admin_username: env::var("ADMIN_USERNAME").unwrap_or_else(|_| "admin".to_string()),
             admin_password: env::var("ADMIN_PASSWORD").unwrap_or_else(|_| "admin".to_string()),
+
+            // default settings
+            default_setting_email: env::var("DEFAULT_SETTING_EMAIL").unwrap_or_else(|_| "mebayu@admin.com".to_string()),
+            default_setting_whatsapp: env::var("DEFAULT_SETTING_WHATSAPP").unwrap_or_else(|_| "628123456789".to_string()),
+            default_setting_hero_images: env::var("DEFAULT_SETTING_HERO_IMAGES")
+                .unwrap_or_else(|_| "http://localhost:9000/mebayu/hero1.jpg,http://localhost:9000/mebayu/hero2.jpg".to_string())
+                .split(',')
+                .map(|s| s.to_string())
+                .collect(),
         }
     }
 
