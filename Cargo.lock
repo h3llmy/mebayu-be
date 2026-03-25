@@ -2311,6 +2311,7 @@ dependencies = [
  "bcrypt",
  "chrono",
  "dotenvy",
+ "http-body-util",
  "jsonwebtoken",
  "metrics",
  "metrics-exporter-prometheus",

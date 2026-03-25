@@ -44,10 +44,24 @@ discovery.relabel "backend_logs" {
   }
 }
 
+loki.process "backend_processing" {
+  stage.json {
+    expressions = {
+      level = "level",
+    }
+  }
+  stage.labels {
+    values = {
+      level = "level",
+    }
+  }
+  forward_to = [loki.write.local.receiver]
+}
+
 loki.source.docker "backend" {
   host = "unix:///var/run/docker.sock"
   targets = discovery.relabel.backend_logs.output
-  forward_to = [loki.write.local.receiver]
+  forward_to = [loki.process.backend_processing.receiver]
 }
 
 // Export logs to Loki

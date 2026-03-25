@@ -105,7 +105,7 @@ impl Config {
         tracing_subscriber::registry()
             .with(filter)
             .with(telemetry)
-            .with(tracing_subscriber::fmt::layer().compact().with_target(true))
+            .with(tracing_subscriber::fmt::layer().json().with_target(true))
             .init();
     }
 }
