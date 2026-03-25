@@ -1,0 +1,58 @@
+// OpenTelemetry traces receiver
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+  output {
+    traces  = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+// Export traces to Tempo
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+}
+
+// Discover and scrape docker logs
+discovery.docker "linux_containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "backend_logs" {
+  targets = discovery.docker.linux_containers.targets
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex = "/mebayu_backend(|_dev)"
+    action = "keep"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    target_label = "container_name"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    target_label = "job"
+    replacement = "mebayu-backend"
+  }
+}
+
+loki.source.docker "backend" {
+  host = "unix:///var/run/docker.sock"
+  targets = discovery.relabel.backend_logs.output
+  forward_to = [loki.write.local.receiver]
+}
+
+// Export logs to Loki
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

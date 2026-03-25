@@ -20,7 +20,7 @@ This project includes Prometheus and Grafana for monitoring and observability.
 
 ## Metrics Exposed
 
-The backend exposes the following metrics at `http://localhost:3000/metrics`:
+The backend exposes the following metrics at `http://localhost:3008/metrics`:
 
 - `http_requests_total`: Total number of HTTP requests (counter)
   - Labels: method, path, status
@@ -41,8 +41,8 @@ docker compose up -d prometheus grafana
 
 1. Access Grafana at http://localhost:3001
 2. Login with admin/admin
-3. Create a new dashboard or explore metrics
-4. Prometheus datasource is already configured
+3. The "Mebayu API Dashboard" is pre-configured and should be available under the "General" folder.
+4. Prometheus and Loki datasources are also pre-configured.
 
 ## Example Queries
 

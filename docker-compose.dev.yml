@@ -32,6 +32,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      alloy:
+        condition: service_started
     networks:
       - mebayu_network
 
@@ -111,8 +113,52 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards/json
     depends_on:
       - prometheus
+      - loki
+      - tempo
     networks:
       - mebayu_network
+
+  loki:
+    image: grafana/loki:latest
+    container_name: mebayu_loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/config.yaml
+    volumes:
+      - ./monitoring/loki_config/config.yaml:/etc/loki/config.yaml
+    networks:
+      - mebayu_network
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: mebayu_tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./monitoring/tempo/tempo.yaml:/etc/tempo.yaml
+    ports:
+      - "3200:3200"
+    networks:
+      - mebayu_network
+
+  alloy:
+    image: grafana/alloy:latest
+    container_name: mebayu_alloy
+    ports:
+      - "12345:12345"
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    depends_on:
+      - loki
+      - tempo
+    networks:
+      - mebayu_network
+

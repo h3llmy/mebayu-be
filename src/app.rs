@@ -97,6 +97,12 @@ pub async fn build_app(config: Config) -> Router {
         config: config.clone(),
     });
 
+    let recorder_handle = PrometheusBuilder::new()
+        .set_buckets(&[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0])
+        .expect("failed to set buckets")
+        .install_recorder()
+        .expect("failed to install Prometheus recorder");
+
     let api_v1_router = Router::new()
         .nest("/auth", auth_routes())
         .nest("/products", product_routes())
@@ -118,12 +124,7 @@ pub async fn build_app(config: Config) -> Router {
         .route(
             "/metrics",
             get(move || {
-                std::future::ready(
-                    PrometheusBuilder::new()
-                        .install_recorder()
-                        .expect("failed to install Prometheus recorder")
-                        .render(),
-                )
+                std::future::ready(recorder_handle.render())
             }),
         )
         .merge(

@@ -1,5 +1,8 @@
 use std::env;
 use tracing_subscriber::{filter::EnvFilter, prelude::*};
+use opentelemetry::trace::TracerProvider as _;
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::trace::TracerProvider as SdkTracerProvider;
 
 #[derive(Clone, Debug, Default)]
 pub struct Config {
@@ -78,8 +81,30 @@ impl Config {
     pub fn logger_setup() {
         let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
+        let otlp_endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
+            .unwrap_or_else(|_| "http://alloy:4317".to_string());
+
+        let exporter = opentelemetry_otlp::SpanExporter::builder()
+            .with_tonic()
+            .with_endpoint(otlp_endpoint)
+            .build()
+            .expect("Error initializing OTLP tracer");
+
+        let provider = SdkTracerProvider::builder()
+            .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
+            .with_resource(opentelemetry_sdk::Resource::new(vec![
+                opentelemetry::KeyValue::new("service.name", "mebayu-backend"),
+            ]))
+            .build();
+
+        opentelemetry::global::set_tracer_provider(provider.clone());
+        let tracer = provider.tracer("mebayu-backend");
+
+        let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+
         tracing_subscriber::registry()
             .with(filter)
+            .with(telemetry)
             .with(tracing_subscriber::fmt::layer().compact().with_target(true))
             .init();
     }
