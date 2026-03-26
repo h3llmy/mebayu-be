@@ -42,6 +42,8 @@ impl SettingServiceImpl {
     }
 
     pub async fn get_first(&self) -> Result<Setting, AppError> {
+        use crate::core::monitoring::observe_redis;
+        
         let mut conn = self
             .redis_client
             .get_multiplexed_async_connection()
@@ -49,7 +51,10 @@ impl SettingServiceImpl {
             .map_err(|e| AppError::Internal(e.to_string()))?;
 
         // Try to get from cache
-        let cached_setting: Option<String> = conn.get(SETTING_CACHE_KEY).await.ok();
+        let cached_setting: Option<String> = observe_redis("get_setting", conn.get(SETTING_CACHE_KEY))
+            .await
+            .ok();
+
         if let Some(cached) = cached_setting {
             if let Ok(setting) = serde_json::from_str::<Setting>(&cached) {
                 return Ok(setting);
@@ -90,10 +95,8 @@ impl SettingServiceImpl {
 
         // Cache the setting
         if let Ok(serialized) = serde_json::to_string(&setting) {
-            let _: () = conn
-                .set_ex(SETTING_CACHE_KEY, serialized, 3600)
-                .await
-                .unwrap_or_default();
+            let _: Result<(), redis::RedisError> = observe_redis("set_setting", conn.set_ex(SETTING_CACHE_KEY, serialized, 3600))
+                .await;
         }
 
         Ok(setting)

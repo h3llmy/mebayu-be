@@ -167,8 +167,8 @@ impl ProductRepository for ProductRepositoryImpl {
             sql_query = sql_query.bind(fid);
         }
 
-        let rows = sql_query
-            .fetch_all(&self.pool)
+        use crate::core::monitoring::observe_db;
+        let rows = observe_db("product.find_all", sql_query.fetch_all(&self.pool))
             .await
             .map_err(|e| AppError::Database(e.to_string()))?;
 
@@ -216,7 +216,8 @@ impl ProductRepository for ProductRepositoryImpl {
     }
 
     async fn find_by_id(&self, id: Uuid) -> Result<Product, AppError> {
-        let row = sqlx::query!(
+        use crate::core::monitoring::observe_db;
+        let row = observe_db("product.find_by_id", sqlx::query!(
             r#"
         SELECT 
             p.*,
@@ -270,7 +271,7 @@ impl ProductRepository for ProductRepositoryImpl {
         "#,
             id
         )
-        .fetch_optional(&self.pool)
+        .fetch_optional(&self.pool))
         .await
         .map_err(|e| AppError::Database(e.to_string()))?
         .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
