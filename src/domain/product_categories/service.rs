@@ -4,11 +4,15 @@ use uuid::Uuid;
 
 use crate::{
     core::error::AppError,
-    domain::product_categories::dto::{CreateProductCategoryRequest, UpdateProductCategoryRequest},
+    domain::{
+        languages::repository::LanguageRepository,
+        product_categories::{
+            dto::{CreateProductCategoryRequest, UpdateProductCategoryRequest},
+            entity::{ProductCategory, ProductCategoryTranslation},
+        },
+    },
     shared::dto::{pagination::PaginationQuery, response::PaginationResponse},
 };
-
-use super::entity::ProductCategory;
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -33,11 +37,18 @@ pub trait ProductCategoryRepository: Send + Sync {
 
 pub struct ProductCategoryServiceImpl {
     repository: Arc<dyn ProductCategoryRepository>,
+    language_repository: Arc<dyn LanguageRepository>,
 }
 
 impl ProductCategoryServiceImpl {
-    pub fn new(repository: Arc<dyn ProductCategoryRepository>) -> Self {
-        Self { repository }
+    pub fn new(
+        repository: Arc<dyn ProductCategoryRepository>,
+        language_repository: Arc<dyn LanguageRepository>,
+    ) -> Self {
+        Self {
+            repository,
+            language_repository,
+        }
     }
 
     pub async fn get_all(
@@ -82,11 +93,26 @@ impl ProductCategoryServiceImpl {
         &self,
         req: CreateProductCategoryRequest,
     ) -> Result<ProductCategory, AppError> {
+        let id = Uuid::new_v4();
+        let mut translations = Vec::new();
+
+        for t_req in req.translations {
+            let language = self
+                .language_repository
+                .find_by_code(&t_req.language_code)
+                .await?;
+            translations.push(ProductCategoryTranslation {
+                category_id: id,
+                language_id: language.id,
+                name: t_req.name,
+            });
+        }
+
         let category = ProductCategory {
-            id: Uuid::new_v4(),
-            name: req.name,
+            id,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
+            translations,
         };
 
         self.repository.create(&category).await
@@ -97,12 +123,30 @@ impl ProductCategoryServiceImpl {
         id: Uuid,
         req: UpdateProductCategoryRequest,
     ) -> Result<ProductCategory, AppError> {
-        let category = self.repository.find_by_id(id).await?;
+        let existing = self.repository.find_by_id(id).await?;
+        let mut translations = Vec::new();
+
+        if let Some(req_translations) = req.translations {
+            for t_req in req_translations {
+                let language = self
+                    .language_repository
+                    .find_by_code(&t_req.language_code)
+                    .await?;
+                translations.push(ProductCategoryTranslation {
+                    category_id: id,
+                    language_id: language.id,
+                    name: t_req.name,
+                });
+            }
+        } else {
+            translations = existing.translations;
+        }
+
         let category = ProductCategory {
             id,
-            name: req.name.unwrap_or(category.name),
-            created_at: category.created_at,
+            created_at: existing.created_at,
             updated_at: chrono::Utc::now(),
+            translations,
         };
         self.repository.update(id, &category).await
     }
@@ -116,17 +160,26 @@ impl ProductCategoryServiceImpl {
 mod tests {
     use super::*;
     use crate::domain::product_categories::entity::ProductCategory;
+    use crate::domain::languages::entity::Language;
+    use crate::domain::languages::repository::MockLanguageRepository;
     use chrono::Utc;
+
+    fn test_lang_id() -> Uuid { Uuid::new_v4() }
 
     #[tokio::test]
     async fn test_get_by_id() {
         let mut mock_repo = MockProductCategoryRepository::new();
+        let mock_lang_repo = MockLanguageRepository::new();
         let id = Uuid::new_v4();
         let expected_category = ProductCategory {
             id,
-            name: "Test Category".to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            translations: vec![ProductCategoryTranslation {
+                category_id: id,
+                language_id: test_lang_id(),
+                name: "Test Category".to_string(),
+            }],
         };
 
         let category_clone = expected_category.clone();
@@ -136,23 +189,29 @@ mod tests {
             .times(1)
             .returning(move |_| Ok(category_clone.clone()));
 
-        let service = ProductCategoryServiceImpl::new(Arc::new(mock_repo));
+        let service = ProductCategoryServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_lang_repo));
         let result = service.get_by_id(id).await.unwrap();
 
         assert_eq!(result.id, expected_category.id);
-        assert_eq!(result.name, expected_category.name);
+        assert_eq!(result.translations[0].name, "Test Category");
     }
 
     #[tokio::test]
     async fn test_get_all() {
         let mut mock_repo = MockProductCategoryRepository::new();
+        let mock_lang_repo = MockLanguageRepository::new();
         let query = PaginationQuery::default();
         let total_data = 1;
+        let id = Uuid::new_v4();
         let categories = vec![ProductCategory {
-            id: Uuid::new_v4(),
-            name: "Test".to_string(),
+            id,
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            translations: vec![ProductCategoryTranslation {
+                category_id: id,
+                language_id: test_lang_id(),
+                name: "Test".to_string(),
+            }],
         }];
 
         let categories_clone = categories.clone();
@@ -161,7 +220,7 @@ mod tests {
             .times(1)
             .returning(move |_| Ok((categories_clone.clone(), total_data)));
 
-        let service = ProductCategoryServiceImpl::new(Arc::new(mock_repo));
+        let service = ProductCategoryServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_lang_repo));
         let result = service.get_all(&query).await.unwrap();
 
         assert_eq!(result.total_data, total_data);
@@ -171,33 +230,59 @@ mod tests {
     #[tokio::test]
     async fn test_create() {
         let mut mock_repo = MockProductCategoryRepository::new();
+        let mut mock_lang_repo = MockLanguageRepository::new();
+        let lang_id = test_lang_id();
         let req = CreateProductCategoryRequest {
-            name: "New Category".to_string(),
+            translations: vec![ProductCategoryTranslationRequest {
+                language_code: "en".to_string(),
+                name: "New Category".to_string(),
+            }],
         };
+
+        mock_lang_repo
+            .expect_find_by_code()
+            .with(mockall::predicate::eq("en"))
+            .returning(move |code| Ok(Language {
+                id: lang_id,
+                code: code.to_string(),
+                name: "English".to_string(),
+                is_default: true,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            }));
 
         mock_repo
             .expect_create()
             .times(1)
             .returning(|category| Ok(category.clone()));
 
-        let service = ProductCategoryServiceImpl::new(Arc::new(mock_repo));
+        let service = ProductCategoryServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_lang_repo));
         let result = service.create(req).await.unwrap();
 
-        assert_eq!(result.name, "New Category");
+        assert_eq!(result.translations[0].name, "New Category");
     }
 
     #[tokio::test]
     async fn test_update() {
         let mut mock_repo = MockProductCategoryRepository::new();
+        let mut mock_lang_repo = MockLanguageRepository::new();
         let id = Uuid::new_v4();
+        let lang_id = test_lang_id();
         let existing = ProductCategory {
             id,
-            name: "Old Name".to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            translations: vec![ProductCategoryTranslation {
+                category_id: id,
+                language_id: lang_id,
+                name: "Old Name".to_string(),
+            }],
         };
         let req = UpdateProductCategoryRequest {
-            name: Some("New Name".to_string()),
+            translations: Some(vec![ProductCategoryTranslationRequest {
+                language_code: "en".to_string(),
+                name: "New Name".to_string(),
+            }]),
         };
 
         let existing_clone = existing.clone();
@@ -206,21 +291,34 @@ mod tests {
             .with(mockall::predicate::eq(id))
             .returning(move |_| Ok(existing_clone.clone()));
 
+        mock_lang_repo
+            .expect_find_by_code()
+            .with(mockall::predicate::eq("en"))
+            .returning(move |code| Ok(Language {
+                id: lang_id,
+                code: code.to_string(),
+                name: "English".to_string(),
+                is_default: true,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            }));
+
         mock_repo
             .expect_update()
             .with(mockall::predicate::eq(id), mockall::predicate::always())
             .times(1)
             .returning(|_, updated| Ok(updated.clone()));
 
-        let service = ProductCategoryServiceImpl::new(Arc::new(mock_repo));
+        let service = ProductCategoryServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_lang_repo));
         let result = service.update(id, req).await.unwrap();
 
-        assert_eq!(result.name, "New Name");
+        assert_eq!(result.translations[0].name, "New Name");
     }
 
     #[tokio::test]
     async fn test_delete() {
         let mut mock_repo = MockProductCategoryRepository::new();
+        let mock_lang_repo = MockLanguageRepository::new();
         let id = Uuid::new_v4();
 
         mock_repo
@@ -229,7 +327,7 @@ mod tests {
             .times(1)
             .returning(|_| Ok(()));
 
-        let service = ProductCategoryServiceImpl::new(Arc::new(mock_repo));
+        let service = ProductCategoryServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_lang_repo));
         let result = service.delete(id).await;
 
         assert!(result.is_ok());

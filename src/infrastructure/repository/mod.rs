@@ -4,3 +4,4 @@ pub mod product_foundation_repository_impl;
 pub mod product_repository_impl;
 pub mod setting_repository_impl;
 pub mod user_repository_impl;
+pub mod language_repository_impl;

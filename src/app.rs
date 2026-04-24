@@ -39,6 +39,7 @@ use crate::{
             product_material_repository_impl::ProductMaterialRepositoryImpl,
             product_foundation_repository_impl::ProductFoundationRepositoryImpl,
             product_repository_impl::ProductRepositoryImpl,
+            language_repository_impl::LanguageRepositoryImpl,
             setting_repository_impl::SettingRepositoryImpl,
             user_repository_impl::UserRepositoryImpl,
         },
@@ -68,14 +69,19 @@ pub async fn build_app(config: Config) -> Router {
     let material_repo = Arc::new(ProductMaterialRepositoryImpl::new(pool.clone()));
     let foundation_repo = Arc::new(ProductFoundationRepositoryImpl::new(pool.clone()));
     let setting_repo = Arc::new(SettingRepositoryImpl::new(pool.clone()));
-    let user_repo = Arc::new(UserRepositoryImpl::new(pool));
+    let lang_repo = Arc::new(LanguageRepositoryImpl::new(pool.clone()));
+    let user_repo = Arc::new(UserRepositoryImpl::new(pool.clone()));
 
     let s3_service = Arc::new(S3Service::new(&config).await);
     let product_service = Arc::new(ProductServiceImpl::new(product_repo, s3_service.clone()));
-    let product_category_service = Arc::new(ProductCategoryServiceImpl::new(category_repo));
-    let product_material_service = Arc::new(ProductMaterialServiceImpl::new(material_repo));
-    let product_foundation_service = Arc::new(ProductFoundationServiceImpl::new(foundation_repo));
-    let setting_service = Arc::new(SettingServiceImpl::new(setting_repo, redis_client.clone(), config.clone()));
+    let product_category_service =
+        Arc::new(ProductCategoryServiceImpl::new(category_repo, lang_repo.clone()));
+    let product_material_service =
+        Arc::new(ProductMaterialServiceImpl::new(material_repo, lang_repo.clone()));
+    let product_foundation_service =
+        Arc::new(ProductFoundationServiceImpl::new(foundation_repo, lang_repo.clone()));
+    let setting_service =
+        Arc::new(SettingServiceImpl::new(setting_repo, redis_client.clone(), config.clone()));
     let user_service = Arc::new(UserServiceImpl::new(user_repo.clone(), config.clone()));
     let auth_service = Arc::new(AuthService::new(
         user_service.clone(),

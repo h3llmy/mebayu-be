@@ -4,11 +4,15 @@ use uuid::Uuid;
 
 use crate::{
     core::error::AppError,
-    domain::product_materials::dto::{CreateProductMaterialRequest, UpdateProductMaterialRequest},
+    domain::{
+        languages::repository::LanguageRepository,
+        product_materials::{
+            dto::{CreateProductMaterialRequest, UpdateProductMaterialRequest},
+            entity::{ProductMaterial, ProductMaterialTranslation},
+        },
+    },
     shared::dto::{pagination::PaginationQuery, response::PaginationResponse},
 };
-
-use super::entity::ProductMaterial;
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -29,11 +33,18 @@ pub trait ProductMaterialRepository: Send + Sync {
 
 pub struct ProductMaterialServiceImpl {
     repository: Arc<dyn ProductMaterialRepository>,
+    language_repository: Arc<dyn LanguageRepository>,
 }
 
 impl ProductMaterialServiceImpl {
-    pub fn new(repository: Arc<dyn ProductMaterialRepository>) -> Self {
-        Self { repository }
+    pub fn new(
+        repository: Arc<dyn ProductMaterialRepository>,
+        language_repository: Arc<dyn LanguageRepository>,
+    ) -> Self {
+        Self {
+            repository,
+            language_repository,
+        }
     }
 
     pub async fn get_all(
@@ -61,11 +72,26 @@ impl ProductMaterialServiceImpl {
         &self,
         req: CreateProductMaterialRequest,
     ) -> Result<ProductMaterial, AppError> {
+        let id = Uuid::new_v4();
+        let mut translations = Vec::new();
+
+        for t_req in req.translations {
+            let language = self
+                .language_repository
+                .find_by_code(&t_req.language_code)
+                .await?;
+            translations.push(ProductMaterialTranslation {
+                material_id: id,
+                language_id: language.id,
+                name: t_req.name,
+            });
+        }
+
         let material = ProductMaterial {
-            id: Uuid::new_v4(),
-            name: req.name,
+            id,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
+            translations,
         };
 
         self.repository.create(&material).await
@@ -76,12 +102,30 @@ impl ProductMaterialServiceImpl {
         id: Uuid,
         req: UpdateProductMaterialRequest,
     ) -> Result<ProductMaterial, AppError> {
-        let material = self.repository.find_by_id(id).await?;
+        let existing = self.repository.find_by_id(id).await?;
+        let mut translations = Vec::new();
+
+        if let Some(req_translations) = req.translations {
+            for t_req in req_translations {
+                let language = self
+                    .language_repository
+                    .find_by_code(&t_req.language_code)
+                    .await?;
+                translations.push(ProductMaterialTranslation {
+                    material_id: id,
+                    language_id: language.id,
+                    name: t_req.name,
+                });
+            }
+        } else {
+            translations = existing.translations;
+        }
+
         let material = ProductMaterial {
             id,
-            name: req.name.unwrap_or(material.name),
-            created_at: material.created_at,
+            created_at: existing.created_at,
             updated_at: chrono::Utc::now(),
+            translations,
         };
         self.repository.update(id, &material).await
     }
@@ -94,17 +138,27 @@ impl ProductMaterialServiceImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::languages::entity::Language;
+    use crate::domain::languages::repository::MockLanguageRepository;
+    use crate::domain::product_materials::entity::ProductMaterial;
     use chrono::Utc;
+
+    fn test_lang_id() -> Uuid { Uuid::new_v4() }
 
     #[tokio::test]
     async fn test_get_by_id() {
         let mut mock_repo = MockProductMaterialRepository::new();
+        let mock_lang_repo = MockLanguageRepository::new();
         let id = Uuid::new_v4();
         let expected_material = ProductMaterial {
             id,
-            name: "Test Material".to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            translations: vec![ProductMaterialTranslation {
+                material_id: id,
+                language_id: test_lang_id(),
+                name: "Test Material".to_string(),
+            }],
         };
 
         let material_clone = expected_material.clone();
@@ -114,23 +168,29 @@ mod tests {
             .times(1)
             .returning(move |_| Ok(material_clone.clone()));
 
-        let service = ProductMaterialServiceImpl::new(Arc::new(mock_repo));
+        let service = ProductMaterialServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_lang_repo));
         let result = service.get_by_id(id).await.unwrap();
 
         assert_eq!(result.id, expected_material.id);
-        assert_eq!(result.name, expected_material.name);
+        assert_eq!(result.translations[0].name, "Test Material");
     }
 
     #[tokio::test]
     async fn test_get_all() {
         let mut mock_repo = MockProductMaterialRepository::new();
+        let mock_lang_repo = MockLanguageRepository::new();
         let query = PaginationQuery::default();
         let total_data = 1;
+        let id = Uuid::new_v4();
         let materials = vec![ProductMaterial {
-            id: Uuid::new_v4(),
-            name: "Test".to_string(),
+            id,
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            translations: vec![ProductMaterialTranslation {
+                material_id: id,
+                language_id: test_lang_id(),
+                name: "Test".to_string(),
+            }],
         }];
 
         let materials_clone = materials.clone();
@@ -139,7 +199,7 @@ mod tests {
             .times(1)
             .returning(move |_| Ok((materials_clone.clone(), total_data)));
 
-        let service = ProductMaterialServiceImpl::new(Arc::new(mock_repo));
+        let service = ProductMaterialServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_lang_repo));
         let result = service.get_all(&query).await.unwrap();
 
         assert_eq!(result.total_data, total_data);
@@ -149,33 +209,59 @@ mod tests {
     #[tokio::test]
     async fn test_create() {
         let mut mock_repo = MockProductMaterialRepository::new();
+        let mut mock_lang_repo = MockLanguageRepository::new();
+        let lang_id = test_lang_id();
         let req = CreateProductMaterialRequest {
-            name: "New Material".to_string(),
+            translations: vec![ProductMaterialTranslationRequest {
+                language_code: "en".to_string(),
+                name: "New Material".to_string(),
+            }],
         };
+
+        mock_lang_repo
+            .expect_find_by_code()
+            .with(mockall::predicate::eq("en"))
+            .returning(move |code| Ok(Language {
+                id: lang_id,
+                code: code.to_string(),
+                name: "English".to_string(),
+                is_default: true,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            }));
 
         mock_repo
             .expect_create()
             .times(1)
             .returning(|material| Ok(material.clone()));
 
-        let service = ProductMaterialServiceImpl::new(Arc::new(mock_repo));
+        let service = ProductMaterialServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_lang_repo));
         let result = service.create(req).await.unwrap();
 
-        assert_eq!(result.name, "New Material");
+        assert_eq!(result.translations[0].name, "New Material");
     }
 
     #[tokio::test]
     async fn test_update() {
         let mut mock_repo = MockProductMaterialRepository::new();
+        let mut mock_lang_repo = MockLanguageRepository::new();
         let id = Uuid::new_v4();
+        let lang_id = test_lang_id();
         let existing = ProductMaterial {
             id,
-            name: "Old Name".to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            translations: vec![ProductMaterialTranslation {
+                material_id: id,
+                language_id: lang_id,
+                name: "Old Name".to_string(),
+            }],
         };
         let req = UpdateProductMaterialRequest {
-            name: Some("New Name".to_string()),
+            translations: Some(vec![ProductMaterialTranslationRequest {
+                language_code: "en".to_string(),
+                name: "New Name".to_string(),
+            }]),
         };
 
         let existing_clone = existing.clone();
@@ -184,21 +270,34 @@ mod tests {
             .with(mockall::predicate::eq(id))
             .returning(move |_| Ok(existing_clone.clone()));
 
+        mock_lang_repo
+            .expect_find_by_code()
+            .with(mockall::predicate::eq("en"))
+            .returning(move |code| Ok(Language {
+                id: lang_id,
+                code: code.to_string(),
+                name: "English".to_string(),
+                is_default: true,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            }));
+
         mock_repo
             .expect_update()
             .with(mockall::predicate::eq(id), mockall::predicate::always())
             .times(1)
             .returning(|_, updated| Ok(updated.clone()));
 
-        let service = ProductMaterialServiceImpl::new(Arc::new(mock_repo));
+        let service = ProductMaterialServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_lang_repo));
         let result = service.update(id, req).await.unwrap();
 
-        assert_eq!(result.name, "New Name");
+        assert_eq!(result.translations[0].name, "New Name");
     }
 
     #[tokio::test]
     async fn test_delete() {
         let mut mock_repo = MockProductMaterialRepository::new();
+        let mock_lang_repo = MockLanguageRepository::new();
         let id = Uuid::new_v4();
 
         mock_repo
@@ -207,7 +306,7 @@ mod tests {
             .times(1)
             .returning(|_| Ok(()));
 
-        let service = ProductMaterialServiceImpl::new(Arc::new(mock_repo));
+        let service = ProductMaterialServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_lang_repo));
         let result = service.delete(id).await;
 
         assert!(result.is_ok());

@@ -5,3 +5,4 @@ pub mod product_materials;
 pub mod products;
 pub mod settings;
 pub mod users;
+pub mod languages;

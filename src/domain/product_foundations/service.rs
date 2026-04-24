@@ -4,11 +4,15 @@ use uuid::Uuid;
 
 use crate::{
     core::error::AppError,
-    domain::product_foundations::dto::{CreateProductFoundationRequest, UpdateProductFoundationRequest},
+    domain::{
+        languages::repository::LanguageRepository,
+        product_foundations::{
+            dto::{CreateProductFoundationRequest, UpdateProductFoundationRequest},
+            entity::{ProductFoundation, ProductFoundationTranslation},
+        },
+    },
     shared::dto::{pagination::PaginationQuery, response::PaginationResponse},
 };
-
-use super::entity::ProductFoundation;
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -29,11 +33,18 @@ pub trait ProductFoundationRepository: Send + Sync {
 
 pub struct ProductFoundationServiceImpl {
     repository: Arc<dyn ProductFoundationRepository>,
+    language_repository: Arc<dyn LanguageRepository>,
 }
 
 impl ProductFoundationServiceImpl {
-    pub fn new(repository: Arc<dyn ProductFoundationRepository>) -> Self {
-        Self { repository }
+    pub fn new(
+        repository: Arc<dyn ProductFoundationRepository>,
+        language_repository: Arc<dyn LanguageRepository>,
+    ) -> Self {
+        Self {
+            repository,
+            language_repository,
+        }
     }
 
     pub async fn get_all(
@@ -61,11 +72,26 @@ impl ProductFoundationServiceImpl {
         &self,
         req: CreateProductFoundationRequest,
     ) -> Result<ProductFoundation, AppError> {
+        let id = Uuid::new_v4();
+        let mut translations = Vec::new();
+
+        for t_req in req.translations {
+            let language = self
+                .language_repository
+                .find_by_code(&t_req.language_code)
+                .await?;
+            translations.push(ProductFoundationTranslation {
+                foundation_id: id,
+                language_id: language.id,
+                name: t_req.name,
+            });
+        }
+
         let foundation = ProductFoundation {
-            id: Uuid::new_v4(),
-            name: req.name,
+            id,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
+            translations,
         };
 
         self.repository.create(&foundation).await
@@ -76,12 +102,30 @@ impl ProductFoundationServiceImpl {
         id: Uuid,
         req: UpdateProductFoundationRequest,
     ) -> Result<ProductFoundation, AppError> {
-        let foundation = self.repository.find_by_id(id).await?;
+        let existing = self.repository.find_by_id(id).await?;
+        let mut translations = Vec::new();
+
+        if let Some(req_translations) = req.translations {
+            for t_req in req_translations {
+                let language = self
+                    .language_repository
+                    .find_by_code(&t_req.language_code)
+                    .await?;
+                translations.push(ProductFoundationTranslation {
+                    foundation_id: id,
+                    language_id: language.id,
+                    name: t_req.name,
+                });
+            }
+        } else {
+            translations = existing.translations;
+        }
+
         let foundation = ProductFoundation {
             id,
-            name: req.name.unwrap_or(foundation.name),
-            created_at: foundation.created_at,
+            created_at: existing.created_at,
             updated_at: chrono::Utc::now(),
+            translations,
         };
         self.repository.update(id, &foundation).await
     }

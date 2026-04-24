@@ -4,6 +4,11 @@ use validator::Validate;
 
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub struct CreateProductFoundationRequest {
-    #[validate(length(min = 1, max = 255))]
+    pub translations: Vec<ProductFoundationTranslationRequest>,
+}
+
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub struct ProductFoundationTranslationRequest {
+    pub language_code: String,
     pub name: String,
 }

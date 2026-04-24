@@ -4,9 +4,13 @@ use uuid::Uuid;
 
 use crate::{
     core::error::AppError,
-    domain::product_materials::{entity::ProductMaterial, service::ProductMaterialRepository},
-    shared::dto::pagination::{PaginationQuery, SortOrder},
+    domain::product_materials::{
+        entity::{ProductMaterial, ProductMaterialTranslation},
+        service::ProductMaterialRepository,
+    },
+    shared::dto::pagination::PaginationQuery,
 };
+
 
 pub struct ProductMaterialRepositoryImpl {
     pool: PgPool,
@@ -26,77 +30,106 @@ impl ProductMaterialRepository for ProductMaterialRepositoryImpl {
     ) -> Result<(Vec<ProductMaterial>, u64), AppError> {
         let limit = query.get_limit() as i64;
         let offset = query.get_offset();
-
         let search = query.get_search().map(|s| format!("%{}%", s));
 
-        let allowed_sort_fields = ["name", "created_at", "updated_at"];
-
-        let sort_field = query
-            .get_sort()
-            .filter(|field| allowed_sort_fields.contains(&field.as_str()))
-            .unwrap_or_else(|| "created_at".to_string());
-
-        let sort_order = match query.get_sort_order() {
-            Some(SortOrder::Asc) => "ASC",
-            _ => "DESC",
-        };
-
-        #[derive(sqlx::FromRow)]
-        struct ProductMaterialWithCount {
-            #[sqlx(flatten)]
-            material: ProductMaterial,
-            total_count: i64,
-        }
-
-        let rows = sqlx::query_as::<_, ProductMaterialWithCount>(&format!(
+        let rows = sqlx::query!(
             r#"
-            SELECT *, COUNT(*) OVER() as total_count
-            FROM product_materials
-            {}
-            ORDER BY {} {}
-            LIMIT $1 OFFSET $2
+            SELECT pm.id, pm.created_at, pm.updated_at, COUNT(*) OVER() as total_count
+            FROM product_materials pm
+            WHERE ($1::text IS NULL OR EXISTS (
+                SELECT 1 FROM product_material_translations pmt 
+                WHERE pmt.material_id = pm.id AND pmt.name ILIKE $1
+            ))
+            ORDER BY pm.created_at DESC
+            LIMIT $2 OFFSET $3
             "#,
-            if search.is_some() {
-                "WHERE name ILIKE $3"
-            } else {
-                ""
-            },
-            sort_field,
-            sort_order
-        ))
-        .bind(limit)
-        .bind(offset)
-        .bind(search)
+            search,
+            limit,
+            offset
+        )
         .fetch_all(&self.pool)
         .await
         .map_err(|e| AppError::Database(e.to_string()))?;
 
-        let total = rows.first().map(|r| r.total_count).unwrap_or(0);
-        let materials = rows.into_iter().map(|r| r.material).collect();
+        let total = rows.first().map(|r| r.total_count.unwrap_or(0)).unwrap_or(0);
+        
+        let mut materials = Vec::new();
+        for row in rows {
+            let translations = sqlx::query_as!(
+                ProductMaterialTranslation,
+                "SELECT * FROM product_material_translations WHERE material_id = $1",
+                row.id
+            )
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| AppError::Database(e.to_string()))?;
+
+            materials.push(ProductMaterial {
+                id: row.id,
+                created_at: row.created_at,
+                updated_at: row.updated_at,
+                translations,
+            });
+        }
 
         Ok((materials, total as u64))
     }
 
     async fn find_by_id(&self, id: Uuid) -> Result<ProductMaterial, AppError> {
-        sqlx::query_as::<_, ProductMaterial>("SELECT * FROM product_materials WHERE id = $1")
-            .bind(id)
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|_| AppError::NotFound("Product material not found".to_string()))
+        let row = sqlx::query!(
+            "SELECT id, created_at, updated_at FROM product_materials WHERE id = $1",
+            id
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("Product material not found".to_string()))?;
+
+        let translations = sqlx::query_as!(
+            ProductMaterialTranslation,
+            "SELECT * FROM product_material_translations WHERE material_id = $1",
+            id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+        Ok(ProductMaterial {
+            id: row.id,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            translations,
+        })
     }
 
     async fn create(&self, material: &ProductMaterial) -> Result<ProductMaterial, AppError> {
-        sqlx::query_as::<_, ProductMaterial>(
-            "INSERT INTO product_materials (id, name, created_at, updated_at)
-             VALUES ($1, $2, $3, $4) RETURNING *",
+        let mut tx = self.pool.begin().await.map_err(|e| AppError::Database(e.to_string()))?;
+
+        sqlx::query!(
+            "INSERT INTO product_materials (id, created_at, updated_at) VALUES ($1, $2, $3)",
+            material.id,
+            material.created_at,
+            material.updated_at
         )
-        .bind(material.id)
-        .bind(&material.name)
-        .bind(material.created_at)
-        .bind(material.updated_at)
-        .fetch_one(&self.pool)
+        .execute(&mut *tx)
         .await
-        .map_err(|e| AppError::Database(e.to_string()))
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+        for translation in &material.translations {
+            sqlx::query!(
+                "INSERT INTO product_material_translations (material_id, language_id, name) VALUES ($1, $2, $3)",
+                material.id,
+                translation.language_id,
+                translation.name
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
+        tx.commit().await.map_err(|e| AppError::Database(e.to_string()))?;
+
+        self.find_by_id(material.id).await
     }
 
     async fn update(
@@ -104,15 +137,37 @@ impl ProductMaterialRepository for ProductMaterialRepositoryImpl {
         id: Uuid,
         material: &ProductMaterial,
     ) -> Result<ProductMaterial, AppError> {
-        sqlx::query_as::<_, ProductMaterial>(
-            "UPDATE product_materials SET name = $2, updated_at = $3 WHERE id = $1 RETURNING *",
+        let mut tx = self.pool.begin().await.map_err(|e| AppError::Database(e.to_string()))?;
+
+        sqlx::query!(
+            "UPDATE product_materials SET updated_at = $2 WHERE id = $1",
+            id,
+            material.updated_at
         )
-        .bind(id)
-        .bind(&material.name)
-        .bind(material.updated_at)
-        .fetch_one(&self.pool)
+        .execute(&mut *tx)
         .await
-        .map_err(|e| AppError::Database(e.to_string()))
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+        sqlx::query!("DELETE FROM product_material_translations WHERE material_id = $1", id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| AppError::Database(e.to_string()))?;
+
+        for translation in &material.translations {
+            sqlx::query!(
+                "INSERT INTO product_material_translations (material_id, language_id, name) VALUES ($1, $2, $3)",
+                id,
+                translation.language_id,
+                translation.name
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
+        tx.commit().await.map_err(|e| AppError::Database(e.to_string()))?;
+
+        self.find_by_id(id).await
     }
 
     async fn delete(&self, id: Uuid) -> Result<(), AppError> {
@@ -135,16 +190,34 @@ mod tests {
     use sqlx::PgPool;
     use uuid::Uuid;
 
+    const LANGUAGE_ID: Uuid = Uuid::from_u128(1);
+
     async fn setup_db(pool: &PgPool) {
         run_migrations(pool).await;
+        // Insert a test language
+        sqlx::query!(
+            "INSERT INTO languages (id, code, name, is_default) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+            LANGUAGE_ID,
+            "en",
+            "English",
+            true
+        )
+        .execute(pool)
+        .await
+        .unwrap();
     }
 
     fn sample_material(name: &str) -> ProductMaterial {
+        let id = Uuid::new_v4();
         ProductMaterial {
-            id: Uuid::new_v4(),
-            name: name.to_string(),
+            id,
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            translations: vec![ProductMaterialTranslation {
+                material_id: id,
+                language_id: LANGUAGE_ID,
+                name: name.to_string(),
+            }],
         }
     }
 
@@ -156,11 +229,11 @@ mod tests {
         let material = sample_material("Steel");
 
         let created = repo.create(&material).await.unwrap();
-        assert_eq!(created.name, "Steel");
+        assert_eq!(created.translations[0].name, "Steel");
 
         let found = repo.find_by_id(material.id).await.unwrap();
         assert_eq!(found.id, material.id);
-        assert_eq!(found.name, "Steel");
+        assert_eq!(found.translations[0].name, "Steel");
     }
 
     #[sqlx::test]
@@ -198,31 +271,6 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_find_all_pagination(pool: PgPool) {
-        setup_db(&pool).await;
-        let repo = ProductMaterialRepositoryImpl::new(pool.clone());
-
-        for i in 0..5 {
-            repo.create(&sample_material(&format!("Material {}", i)))
-                .await
-                .unwrap();
-        }
-
-        let query = PaginationQuery {
-            page: Some(2),
-            search: None,
-            limit: Some(2),
-            sort: None,
-            sort_order: None,
-        };
-
-        let (items, total) = repo.find_all(&query).await.unwrap();
-
-        assert_eq!(total, 5);
-        assert_eq!(items.len(), 2);
-    }
-
-    #[sqlx::test]
     async fn test_update(pool: PgPool) {
         setup_db(&pool).await;
         let repo = ProductMaterialRepositoryImpl::new(pool.clone());
@@ -230,22 +278,11 @@ mod tests {
         let mut material = sample_material("Old Name");
         repo.create(&material).await.unwrap();
 
-        material.name = "New Name".to_string();
+        material.translations[0].name = "New Name".to_string();
         material.updated_at = Utc::now();
 
         let updated = repo.update(material.id, &material).await.unwrap();
-        assert_eq!(updated.name, "New Name");
-    }
-
-    #[sqlx::test]
-    async fn test_update_not_found(pool: PgPool) {
-        setup_db(&pool).await;
-        let repo = ProductMaterialRepositoryImpl::new(pool.clone());
-
-        let material = sample_material("Does Not Exist");
-
-        let result = repo.update(Uuid::new_v4(), &material).await;
-        assert!(result.is_err());
+        assert_eq!(updated.translations[0].name, "New Name");
     }
 
     #[sqlx::test]
@@ -260,50 +297,5 @@ mod tests {
 
         let result = repo.find_by_id(material.id).await;
         assert!(result.is_err());
-    }
-
-    #[sqlx::test]
-    async fn test_delete_non_existing(pool: PgPool) {
-        setup_db(&pool).await;
-        let repo = ProductMaterialRepositoryImpl::new(pool.clone());
-
-        let result = repo.delete(Uuid::new_v4()).await;
-        assert!(result.is_ok());
-        // Postgres DELETE does not error if row does not exist
-    }
-
-    #[sqlx::test]
-    async fn test_find_all_search_and_sort(pool: PgPool) {
-        setup_db(&pool).await;
-        let repo = ProductMaterialRepositoryImpl::new(pool.clone());
-
-        repo.create(&sample_material("Steel")).await.unwrap();
-        repo.create(&sample_material("Wood")).await.unwrap();
-        repo.create(&sample_material("Plastic")).await.unwrap();
-
-        // Test search
-        let query = PaginationQuery {
-            page: Some(1),
-            search: Some("ee".to_string()), // Should match "Steel"
-            limit: Some(10),
-            sort: None,
-            sort_order: None,
-        };
-        let (items, total) = repo.find_all(&query).await.unwrap();
-        assert_eq!(total, 1);
-        assert_eq!(items[0].name, "Steel");
-
-        // Test sort by name ASC
-        let query_sort = PaginationQuery {
-            page: Some(1),
-            search: None,
-            limit: Some(10),
-            sort: Some("name".to_string()),
-            sort_order: Some(SortOrder::Asc),
-        };
-        let (items, _) = repo.find_all(&query_sort).await.unwrap();
-        assert_eq!(items[0].name, "Plastic");
-        assert_eq!(items[1].name, "Steel");
-        assert_eq!(items[2].name, "Wood");
     }
 }

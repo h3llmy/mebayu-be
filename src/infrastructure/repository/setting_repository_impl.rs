@@ -29,7 +29,7 @@ impl SettingRepository for SettingRepositoryImpl {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| AppError::Database(e.to_string()))?;
+        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         if let Some(mut s) = setting {
             let images = sqlx::query_as!(
@@ -39,7 +39,7 @@ impl SettingRepository for SettingRepositoryImpl {
             )
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
             s.hero_images = images;
             Ok(Some(s))
         } else {
@@ -52,7 +52,7 @@ impl SettingRepository for SettingRepositoryImpl {
             .pool
             .begin()
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         let mut setting_res = sqlx::query_as::<_, Setting>(
             r#"
@@ -68,7 +68,7 @@ impl SettingRepository for SettingRepositoryImpl {
         .bind(setting.updated_at)
         .fetch_one(&mut *tx)
         .await
-        .map_err(|e| AppError::Database(e.to_string()))?;
+        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         let mut created_images = Vec::new();
         for image in &setting.hero_images {
@@ -88,13 +88,13 @@ impl SettingRepository for SettingRepositoryImpl {
             )
             .fetch_one(&mut *tx)
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
             created_images.push(res);
         }
 
         tx.commit()
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
         setting_res.hero_images = created_images;
         Ok(setting_res)
     }
@@ -104,7 +104,7 @@ impl SettingRepository for SettingRepositoryImpl {
             .pool
             .begin()
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         let mut setting_res = sqlx::query_as::<_, Setting>(
             r#"
@@ -120,14 +120,14 @@ impl SettingRepository for SettingRepositoryImpl {
         .bind(setting.updated_at)
         .fetch_optional(&mut *tx)
         .await
-        .map_err(|e| AppError::Database(e.to_string()))?
+        .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?
         .ok_or_else(|| AppError::NotFound("Setting not found".to_string()))?;
 
         // Delete old images
         sqlx::query!("DELETE FROM hero_images WHERE setting_id = $1", id)
             .execute(&mut *tx)
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         // Insert new images
         let mut created_images = Vec::new();
@@ -148,13 +148,13 @@ impl SettingRepository for SettingRepositoryImpl {
             )
             .fetch_one(&mut *tx)
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
             created_images.push(res);
         }
 
         tx.commit()
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
         setting_res.hero_images = created_images;
         Ok(setting_res)
     }
@@ -163,7 +163,7 @@ impl SettingRepository for SettingRepositoryImpl {
         let result = sqlx::query!("DELETE FROM settings WHERE id = $1", id)
             .execute(&self.pool)
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
 
         if result.rows_affected() == 0 {
             return Err(AppError::NotFound("Setting not found".to_string()));

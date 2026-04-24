@@ -8,36 +8,37 @@ use crate::domain::product_categories::entity::ProductCategory;
 use crate::domain::product_foundations::entity::ProductFoundation;
 use crate::domain::product_materials::entity::ProductMaterial;
 
-#[derive(Clone, Serialize, Deserialize, FromRow, ToSchema)]
+#[derive(Clone, Serialize, Deserialize, ToSchema)]
 pub struct Product {
     pub id: Uuid,
-    pub name: String,
     pub price: f64,
-    pub description: String,
     pub status: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     #[serde(skip_deserializing)]
-    #[sqlx(skip)]
     pub category_ids: Vec<Uuid>,
     #[serde(skip_deserializing)]
-    #[sqlx(skip)]
     pub material_ids: Vec<Uuid>,
     #[serde(skip_deserializing)]
-    #[sqlx(skip)]
     pub foundation_ids: Vec<Uuid>,
     #[serde(skip_deserializing)]
-    #[sqlx(default)]
     pub categories: Vec<ProductCategory>,
     #[serde(skip_deserializing)]
-    #[sqlx(default)]
     pub product_foundations: Vec<ProductFoundation>,
     #[serde(skip_deserializing)]
-    #[sqlx(default)]
     pub product_materials: Vec<ProductMaterial>,
     #[serde(skip_deserializing)]
-    #[sqlx(default)]
     pub images: Vec<ProductImage>,
+    #[serde(skip_deserializing)]
+    pub translations: Vec<ProductTranslation>,
+}
+
+#[derive(Clone, Serialize, Deserialize, FromRow, ToSchema)]
+pub struct ProductTranslation {
+    pub product_id: Uuid,
+    pub language_id: Uuid,
+    pub name: String,
+    pub description: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, FromRow, Debug, ToSchema)]

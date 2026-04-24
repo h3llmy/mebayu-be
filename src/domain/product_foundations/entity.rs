@@ -4,10 +4,17 @@ use sqlx::FromRow;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Clone, Serialize, Deserialize, FromRow, ToSchema)]
+#[derive(Clone, Serialize, Deserialize, ToSchema)]
 pub struct ProductFoundation {
     pub id: Uuid,
-    pub name: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub translations: Vec<ProductFoundationTranslation>,
+}
+
+#[derive(Clone, Serialize, Deserialize, FromRow, ToSchema)]
+pub struct ProductFoundationTranslation {
+    pub foundation_id: Uuid,
+    pub language_id: Uuid,
+    pub name: String,
 }
