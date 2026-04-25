@@ -7,7 +7,7 @@ use crate::{
         product_materials::service::ProductMaterialServiceImpl,
         product_foundations::service::ProductFoundationServiceImpl,
         products::service::ProductServiceImpl, users::service::UserServiceImpl,
-        settings::service::SettingServiceImpl,
+        settings::service::SettingServiceImpl, languages::service::LanguageService,
     },
     infrastructure::object_storage::s3::S3Service,
 };
@@ -20,6 +20,7 @@ pub struct AppState {
     pub product_foundation_service: Arc<ProductFoundationServiceImpl>,
     pub setting_service: Arc<SettingServiceImpl>,
     pub user_service: Arc<UserServiceImpl>,
+    pub language_service: Arc<LanguageService>,
     pub auth_service: Arc<AuthService>,
     pub redis_client: redis::Client,
     pub s3_service: Arc<S3Service>,

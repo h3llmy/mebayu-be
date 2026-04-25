@@ -27,7 +27,7 @@ use crate::{
         product_materials::service::ProductMaterialServiceImpl,
         product_foundations::service::ProductFoundationServiceImpl,
         products::service::ProductServiceImpl, users::service::UserServiceImpl,
-        settings::service::SettingServiceImpl,
+        settings::service::SettingServiceImpl, languages::service::LanguageService,
     },
     infrastructure::{
         database::{
@@ -82,6 +82,7 @@ pub async fn build_app(config: Config) -> Router {
         Arc::new(ProductFoundationServiceImpl::new(foundation_repo, lang_repo.clone()));
     let setting_service =
         Arc::new(SettingServiceImpl::new(setting_repo, redis_client.clone(), config.clone()));
+    let language_service = Arc::new(LanguageService::new(lang_repo.clone()));
     let user_service = Arc::new(UserServiceImpl::new(user_repo.clone(), config.clone()));
     let auth_service = Arc::new(AuthService::new(
         user_service.clone(),
@@ -96,8 +97,9 @@ pub async fn build_app(config: Config) -> Router {
         product_material_service,
         product_foundation_service,
         setting_service,
-        user_service,
-        auth_service,
+        user_service: user_service.clone(),
+        language_service,
+        auth_service: auth_service.clone(),
         redis_client,
         s3_service,
         config: config.clone(),
@@ -118,6 +120,7 @@ pub async fn build_app(config: Config) -> Router {
         .nest("/settings", setting_routes())
         .nest("/users", routes())
         .nest("/storages", storage_routes())
+        .nest("/languages", language_routes())
         .layer(middleware::from_fn_with_state(
             state.clone(),
             rate_limiter_middleware,

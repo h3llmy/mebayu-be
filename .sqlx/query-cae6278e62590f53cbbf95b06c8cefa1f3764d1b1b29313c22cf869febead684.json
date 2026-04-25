@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT pc.id, pc.created_at, pc.updated_at, COUNT(*) OVER() as total_count\n            FROM product_categories pc\n            WHERE ($1::text IS NULL OR EXISTS (\n                SELECT 1 FROM product_category_translations pct \n                WHERE pct.category_id = pc.id AND pct.name ILIKE $1\n            ))\n            ORDER BY pc.created_at DESC\n            LIMIT $2 OFFSET $3\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "total_count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "cae6278e62590f53cbbf95b06c8cefa1f3764d1b1b29313c22cf869febead684"
+}

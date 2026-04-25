@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            UPDATE product_foundations \n            SET name = $2, updated_at = $3\n            WHERE id = $1\n            RETURNING *\n            ",
+  "query": "SELECT id, created_at, updated_at FROM product_categories WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -10,33 +10,25 @@
       },
       {
         "ordinal": 1,
-        "name": "name",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 2,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 3,
+        "ordinal": 2,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Text",
-        "Timestamptz"
+        "Uuid"
       ]
     },
     "nullable": [
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "a77b80c45d1f0f3579bb5c31723f5100078db12e9d3d240a8d4879783d89c010"
+  "hash": "c4767d174803b87fb1f91fa7845f7b7eb94ac1673bf54099a4f59e289fe1fe6e"
 }

@@ -141,6 +141,7 @@ mod tests {
     use crate::domain::languages::entity::Language;
     use crate::domain::languages::repository::MockLanguageRepository;
     use crate::domain::product_materials::entity::ProductMaterial;
+    use crate::domain::product_materials::dto::ProductMaterialTranslationRequest;
     use chrono::Utc;
 
     fn test_lang_id() -> Uuid { Uuid::new_v4() }

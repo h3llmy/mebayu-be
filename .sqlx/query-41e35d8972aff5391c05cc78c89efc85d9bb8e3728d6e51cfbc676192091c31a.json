@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT pm.id, pm.created_at, pm.updated_at, COUNT(*) OVER() as total_count\n            FROM product_materials pm\n            WHERE ($1::text IS NULL OR EXISTS (\n                SELECT 1 FROM product_material_translations pmt \n                WHERE pmt.material_id = pm.id AND pmt.name ILIKE $1\n            ))\n            ORDER BY pm.created_at DESC\n            LIMIT $2 OFFSET $3\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "total_count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "41e35d8972aff5391c05cc78c89efc85d9bb8e3728d6e51cfbc676192091c31a"
+}

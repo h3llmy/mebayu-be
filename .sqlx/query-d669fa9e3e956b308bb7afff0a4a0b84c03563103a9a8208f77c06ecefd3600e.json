@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM product_foundation_translations WHERE foundation_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d669fa9e3e956b308bb7afff0a4a0b84c03563103a9a8208f77c06ecefd3600e"
+}

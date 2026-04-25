@@ -8,6 +8,7 @@ use crate::{
         products::dto::*,
         products::entity::*, 
         settings::dto::request::*, settings::entity::*,
+        languages::dto::*, languages::entity::*,
         users::dto::*, users::entity::*,
     },
     presentation::http::*,
@@ -57,6 +58,11 @@ use utoipa::{
         setting_controller::get_setting,
         setting_controller::update,
         setting_controller::delete,
+        language_controller::get_all,
+        language_controller::get_by_id,
+        language_controller::create,
+        language_controller::update,
+        language_controller::delete,
     ),
     components(
         schemas(
@@ -69,8 +75,9 @@ use utoipa::{
             CreateUserDto, UpdateUserDto, UserResponseDto, UserRole,
             PaginationQuery, SortOrder, ErrorResponse,
             ApiResponse<Product>, ApiResponse<UserResponseDto>, ApiResponse<ProductCategory>, ApiResponse<ProductMaterial>, ApiResponse<ProductFoundation>, ApiResponse<GetUploadUrlResponse>,
-            ApiResponse<Setting>,
-            PaginationResponse<Vec<Product>>, PaginationResponse<Vec<ProductCategory>>, PaginationResponse<Vec<ProductMaterial>>, PaginationResponse<Vec<ProductFoundation>>, PaginationResponse<Vec<UserResponseDto>>
+            ApiResponse<Setting>, ApiResponse<Language>, ApiResponse<Vec<Language>>,
+            PaginationResponse<Vec<Product>>, PaginationResponse<Vec<ProductCategory>>, PaginationResponse<Vec<ProductMaterial>>, PaginationResponse<Vec<ProductFoundation>>, PaginationResponse<Vec<UserResponseDto>>,
+            CreateLanguageRequest, UpdateLanguageRequest, Language
         )
     ),
     modifiers(&SecurityAddon),
