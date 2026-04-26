@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO settings (id, email, whatsapp_number, created_at, updated_at) VALUES ($1, 'contact@mebayu.com', '+1234567890', $2, $3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c494c078fcd2b9cc8e4a0f28e1fea122c4b99b4856867392a7d9698fb5d00685"
+}

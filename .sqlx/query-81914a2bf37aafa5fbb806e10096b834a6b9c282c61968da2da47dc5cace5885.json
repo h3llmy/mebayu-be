@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM product_material_translations",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "81914a2bf37aafa5fbb806e10096b834a6b9c282c61968da2da47dc5cace5885"
+}

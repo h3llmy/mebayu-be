@@ -57,7 +57,7 @@ impl ProductFoundationRepository for ProductFoundationRepositoryImpl {
         for row in rows {
             let translations = sqlx::query_as!(
                 ProductFoundationTranslation,
-                "SELECT * FROM product_foundation_translations WHERE foundation_id = $1",
+                "SELECT foundation_id, language_id, name FROM product_foundation_translations WHERE foundation_id = $1",
                 row.id
             )
             .fetch_all(&self.pool)
@@ -87,7 +87,7 @@ impl ProductFoundationRepository for ProductFoundationRepositoryImpl {
 
         let translations = sqlx::query_as!(
             ProductFoundationTranslation,
-            "SELECT * FROM product_foundation_translations WHERE foundation_id = $1",
+            "SELECT foundation_id, language_id, name FROM product_foundation_translations WHERE foundation_id = $1",
             id
         )
         .fetch_all(&self.pool)

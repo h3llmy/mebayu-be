@@ -203,7 +203,7 @@ impl ProductRepository for ProductRepositoryImpl {
         let cat_ids: Vec<Uuid> = all_cat_rows.iter().map(|r| r.id).collect();
         let all_cat_translations = sqlx::query_as!(
             ProductCategoryTranslation,
-            "SELECT * FROM product_category_translations WHERE category_id = ANY($1)",
+            "SELECT category_id, language_id, name FROM product_category_translations WHERE category_id = ANY($1)",
             &cat_ids
         )
         .fetch_all(&self.pool)
@@ -224,7 +224,7 @@ impl ProductRepository for ProductRepositoryImpl {
         let mat_ids: Vec<Uuid> = all_mat_rows.iter().map(|r| r.id).collect();
         let all_mat_translations = sqlx::query_as!(
             ProductMaterialTranslation,
-            "SELECT * FROM product_material_translations WHERE material_id = ANY($1)",
+            "SELECT material_id, language_id, name FROM product_material_translations WHERE material_id = ANY($1)",
             &mat_ids
         )
         .fetch_all(&self.pool)
@@ -245,7 +245,7 @@ impl ProductRepository for ProductRepositoryImpl {
         let found_ids: Vec<Uuid> = all_found_rows.iter().map(|r| r.id).collect();
         let all_found_translations = sqlx::query_as!(
             ProductFoundationTranslation,
-            "SELECT * FROM product_foundation_translations WHERE foundation_id = ANY($1)",
+            "SELECT foundation_id, language_id, name FROM product_foundation_translations WHERE foundation_id = ANY($1)",
             &found_ids
         )
         .fetch_all(&self.pool)
@@ -275,7 +275,7 @@ impl ProductRepository for ProductRepositoryImpl {
                     }
                 }).collect();
 
-            let product_materials: Vec<ProductMaterial> = all_mat_rows.iter()
+            let materials: Vec<ProductMaterial> = all_mat_rows.iter()
                 .filter(|mr| mr.product_id == pid)
                 .map(|mr| {
                     let trans: Vec<ProductMaterialTranslation> = all_mat_translations.iter()
@@ -288,7 +288,7 @@ impl ProductRepository for ProductRepositoryImpl {
                     }
                 }).collect();
 
-            let product_foundations: Vec<ProductFoundation> = all_found_rows.iter()
+            let foundations: Vec<ProductFoundation> = all_found_rows.iter()
                 .filter(|fr| fr.product_id == pid)
                 .map(|fr| {
                     let trans: Vec<ProductFoundationTranslation> = all_found_translations.iter()
@@ -308,11 +308,11 @@ impl ProductRepository for ProductRepositoryImpl {
                 created_at: r.get("created_at"),
                 updated_at: r.get("updated_at"),
                 category_ids: categories.iter().map(|c| c.id).collect(),
-                material_ids: product_materials.iter().map(|m| m.id).collect(),
-                foundation_ids: product_foundations.iter().map(|f| f.id).collect(),
-                categories,
-                product_materials,
-                product_foundations,
+                material_ids: materials.iter().map(|m| m.id).collect(),
+                foundation_ids: foundations.iter().map(|f| f.id).collect(),
+                product_categories: categories,
+                product_materials: materials,
+                product_foundations: foundations,
                 images,
                 translations,
             }
@@ -367,7 +367,7 @@ impl ProductRepository for ProductRepositoryImpl {
         for cat_row in category_rows {
             let cat_translations = sqlx::query_as!(
                 ProductCategoryTranslation,
-                "SELECT * FROM product_category_translations WHERE category_id = $1",
+                "SELECT category_id, language_id, name FROM product_category_translations WHERE category_id = $1",
                 cat_row.id
             )
             .fetch_all(&self.pool)
@@ -393,18 +393,18 @@ impl ProductRepository for ProductRepositoryImpl {
         .await
         .map_err(|e| AppError::Database(e.to_string()))?;
 
-        let mut product_materials = Vec::new();
+        let mut materials = Vec::new();
         for mat_row in material_rows {
             let mat_translations = sqlx::query_as!(
                 ProductMaterialTranslation,
-                "SELECT * FROM product_material_translations WHERE material_id = $1",
+                "SELECT material_id, language_id, name FROM product_material_translations WHERE material_id = $1",
                 mat_row.id
             )
             .fetch_all(&self.pool)
             .await
             .map_err(|e| AppError::Database(e.to_string()))?;
 
-            product_materials.push(ProductMaterial {
+            materials.push(ProductMaterial {
                 id: mat_row.id,
                 created_at: mat_row.created_at,
                 updated_at: mat_row.updated_at,
@@ -423,18 +423,18 @@ impl ProductRepository for ProductRepositoryImpl {
         .await
         .map_err(|e| AppError::Database(e.to_string()))?;
 
-        let mut product_foundations = Vec::new();
+        let mut foundations = Vec::new();
         for f_row in foundation_rows {
             let f_translations = sqlx::query_as!(
                 ProductFoundationTranslation,
-                "SELECT * FROM product_foundation_translations WHERE foundation_id = $1",
+                "SELECT foundation_id, language_id, name FROM product_foundation_translations WHERE foundation_id = $1",
                 f_row.id
             )
             .fetch_all(&self.pool)
             .await
             .map_err(|e| AppError::Database(e.to_string()))?;
 
-            product_foundations.push(ProductFoundation {
+            foundations.push(ProductFoundation {
                 id: f_row.id,
                 created_at: f_row.created_at,
                 updated_at: f_row.updated_at,
@@ -449,11 +449,11 @@ impl ProductRepository for ProductRepositoryImpl {
             created_at: row.created_at,
             updated_at: row.updated_at,
             category_ids: categories.iter().map(|c| c.id).collect(),
-            material_ids: product_materials.iter().map(|m| m.id).collect(),
-            foundation_ids: product_foundations.iter().map(|f| f.id).collect(),
-            categories,
-            product_materials,
-            product_foundations,
+            material_ids: materials.iter().map(|m| m.id).collect(),
+            foundation_ids: foundations.iter().map(|f| f.id).collect(),
+            product_categories: categories,
+            product_materials: materials,
+            product_foundations: foundations,
             images,
             translations,
         })
@@ -541,7 +541,7 @@ impl ProductRepository for ProductRepositoryImpl {
         let cat_ids: Vec<Uuid> = all_cat_rows.iter().map(|cr| cr.id).collect();
         let all_cat_translations = sqlx::query_as!(
             ProductCategoryTranslation,
-            "SELECT * FROM product_category_translations WHERE category_id = ANY($1)",
+            "SELECT category_id, language_id, name FROM product_category_translations WHERE category_id = ANY($1)",
             &cat_ids
         )
         .fetch_all(&self.pool)
@@ -561,7 +561,7 @@ impl ProductRepository for ProductRepositoryImpl {
         let mat_ids: Vec<Uuid> = all_mat_rows.iter().map(|mr| mr.id).collect();
         let all_mat_translations = sqlx::query_as!(
             ProductMaterialTranslation,
-            "SELECT * FROM product_material_translations WHERE material_id = ANY($1)",
+            "SELECT material_id, language_id, name FROM product_material_translations WHERE material_id = ANY($1)",
             &mat_ids
         )
         .fetch_all(&self.pool)
@@ -581,7 +581,7 @@ impl ProductRepository for ProductRepositoryImpl {
         let found_ids: Vec<Uuid> = all_found_rows.iter().map(|fr| fr.id).collect();
         let all_found_translations = sqlx::query_as!(
             ProductFoundationTranslation,
-            "SELECT * FROM product_foundation_translations WHERE foundation_id = ANY($1)",
+            "SELECT foundation_id, language_id, name FROM product_foundation_translations WHERE foundation_id = ANY($1)",
             &found_ids
         )
         .fetch_all(&self.pool)
@@ -610,7 +610,7 @@ impl ProductRepository for ProductRepositoryImpl {
                     }
                 }).collect();
 
-            let product_materials: Vec<ProductMaterial> = all_mat_rows.iter()
+            let materials: Vec<ProductMaterial> = all_mat_rows.iter()
                 .filter(|mr| mr.product_id == pid)
                 .map(|mr| {
                     let trans: Vec<ProductMaterialTranslation> = all_mat_translations.iter()
@@ -623,7 +623,7 @@ impl ProductRepository for ProductRepositoryImpl {
                     }
                 }).collect();
 
-            let product_foundations: Vec<ProductFoundation> = all_found_rows.iter()
+            let foundations: Vec<ProductFoundation> = all_found_rows.iter()
                 .filter(|fr| fr.product_id == pid)
                 .map(|fr| {
                     let trans: Vec<ProductFoundationTranslation> = all_found_translations.iter()
@@ -643,11 +643,11 @@ impl ProductRepository for ProductRepositoryImpl {
                 created_at: r.get("created_at"),
                 updated_at: r.get("updated_at"),
                 category_ids: categories.iter().map(|c| c.id).collect(),
-                material_ids: product_materials.iter().map(|m| m.id).collect(),
-                foundation_ids: product_foundations.iter().map(|f| f.id).collect(),
-                categories,
-                product_materials,
-                product_foundations,
+                material_ids: materials.iter().map(|m| m.id).collect(),
+                foundation_ids: foundations.iter().map(|f| f.id).collect(),
+                product_categories: categories,
+                product_materials: materials,
+                product_foundations: foundations,
                 images,
                 translations,
             }
@@ -1042,7 +1042,7 @@ mod tests {
             category_ids: vec![category_id],
             material_ids: vec![material_id],
             foundation_ids: vec![foundation_id],
-            categories: vec![],
+            product_categories: vec![],
             product_materials: vec![],
             product_foundations: vec![],
             images: vec![],

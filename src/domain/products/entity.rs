@@ -15,21 +15,13 @@ pub struct Product {
     pub status: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    #[serde(skip_deserializing)]
     pub category_ids: Vec<Uuid>,
-    #[serde(skip_deserializing)]
     pub material_ids: Vec<Uuid>,
-    #[serde(skip_deserializing)]
     pub foundation_ids: Vec<Uuid>,
-    #[serde(skip_deserializing)]
-    pub categories: Vec<ProductCategory>,
-    #[serde(skip_deserializing)]
+    pub product_categories: Vec<ProductCategory>,
     pub product_foundations: Vec<ProductFoundation>,
-    #[serde(skip_deserializing)]
     pub product_materials: Vec<ProductMaterial>,
-    #[serde(skip_deserializing)]
     pub images: Vec<ProductImage>,
-    #[serde(skip_deserializing)]
     pub translations: Vec<ProductTranslation>,
 }
 
