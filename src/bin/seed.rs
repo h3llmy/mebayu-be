@@ -74,7 +74,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     sqlx::query!("INSERT INTO product_foundation_relations (product_id, foundation_id) VALUES ($1, $2)", prod_id, found_id).execute(&pool).await?;
 
     // 8. Product Image
-    sqlx::query!("INSERT INTO product_images (id, product_id, url, created_at, updated_at) VALUES ($1, $2, 'https://example.com/image.png', $3, $4)", Uuid::new_v4(), prod_id, now, now).execute(&pool).await?;
+    sqlx::query!("INSERT INTO product_images (id, product_id, url, created_at, updated_at) VALUES ($1, $2, 'https://s3.dwikihome.my.id/mebayu/products/9750b53f-c901-4c7a-b2bb-cca4d986d091.jpg', $3, $4)", Uuid::new_v4(), prod_id, now, now).execute(&pool).await?;
 
     // 9. Settings
     let setting_id = Uuid::new_v4();
@@ -87,18 +87,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ).execute(&pool).await?;
 
     sqlx::query!(
-        "INSERT INTO hero_images (id, setting_id, image_url, order_index, created_at, updated_at) VALUES ($1, $2, 'https://example.com/hero1.jpg', 0, $3, $4)",
+        "INSERT INTO hero_images (id, setting_id, image_url, order_index, created_at, updated_at) VALUES ($1, $2, 'https://s3.dwikihome.my.id/mebayu/products/9750b53f-c901-4c7a-b2bb-cca4d986d091.jpg', 0, $3, $4)",
         Uuid::new_v4(), setting_id, now, now
-    ).execute(&pool).await?;
-
-    // 10. Users
-    // Only adding basic user (admin is handled automatically)
-    let user_id = Uuid::new_v4();
-    // Use an arbitrarily valid bcrypt hash for "password"
-    let hash = "$2b$12$NqL1VOTGOr63Rk96fD4Opu06D76gO8r7J3kFj1C/A9Y8H7I4T.RUK";
-    sqlx::query!(
-        "INSERT INTO users (id, username, email, password_hash, role, created_at, updated_at) VALUES ($1, 'john_doe', 'john@example.com', $2, 'user', $3, $4) ON CONFLICT DO NOTHING",
-        user_id, hash, now, now
     ).execute(&pool).await?;
 
     println!("Seeding complete!");
