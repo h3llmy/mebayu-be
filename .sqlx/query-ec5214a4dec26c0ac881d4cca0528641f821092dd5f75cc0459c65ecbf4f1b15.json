@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO product_images (id, product_id, url, created_at, updated_at) VALUES ($1, $2, 'https://s3.dwikihome.my.id/mebayu/products/9750b53f-c901-4c7a-b2bb-cca4d986d091.jpg', $3, $4)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ec5214a4dec26c0ac881d4cca0528641f821092dd5f75cc0459c65ecbf4f1b15"
+}

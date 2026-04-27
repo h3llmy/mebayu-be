@@ -24,6 +24,10 @@ impl LanguageService {
         self.repository.find_all().await
     }
 
+    pub async fn get_by_code(&self, code: &str) -> Result<Language, AppError> {
+        self.repository.find_by_code(code).await
+    }
+
     pub async fn get_by_id(&self, id: Uuid) -> Result<Language, AppError> {
         self.repository.find_by_id(id).await
     }

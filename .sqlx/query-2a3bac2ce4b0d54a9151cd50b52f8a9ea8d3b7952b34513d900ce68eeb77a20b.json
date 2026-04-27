@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO product_category_translations (category_id, language_id, name, description) VALUES ($1, $2, 'Kalung', 'Kalung elegan untuk berbagai acara.')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2a3bac2ce4b0d54a9151cd50b52f8a9ea8d3b7952b34513d900ce68eeb77a20b"
+}

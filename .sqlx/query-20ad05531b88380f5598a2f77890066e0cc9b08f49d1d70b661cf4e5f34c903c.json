@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT category_id, language_id, name FROM product_category_translations WHERE category_id = ANY($1)",
+  "query": "SELECT material_id, language_id, name FROM product_material_translations \n                 WHERE material_id = $1 AND ($2::uuid IS NULL OR language_id = $2)",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "category_id",
+        "name": "material_id",
         "type_info": "Uuid"
       },
       {
@@ -21,7 +21,8 @@
     ],
     "parameters": {
       "Left": [
-        "UuidArray"
+        "Uuid",
+        "Uuid"
       ]
     },
     "nullable": [
@@ -30,5 +31,5 @@
       false
     ]
   },
-  "hash": "154e9f19ef292bccab3f673789b4ff280cd96559d09a214baf7826a2fd9645dd"
+  "hash": "20ad05531b88380f5598a2f77890066e0cc9b08f49d1d70b661cf4e5f34c903c"
 }

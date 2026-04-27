@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO product_foundation_translations (foundation_id, language_id, name, description) VALUES ($1, $2, 'Padat', 'Pondasi yang kuat dan tahan lama.')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d08e9835f5cae8c8a10bbaffd6a101a49a298240f5c01740d506a69037f405bc"
+}

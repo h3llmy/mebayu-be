@@ -9,7 +9,7 @@ use crate::{
     core::{
         error::{AppError, ErrorResponse},
         middleware::auth::AuthUser,
-        validation::{ValidatedJson, ValidatedQuery},
+        validation::{ValidatedJson, ValidatedQuery, LanguageCode},
     },
     domain::{
         product_categories::{
@@ -40,7 +40,7 @@ pub fn category_routes() -> Router<Arc<AppState>> {
     operation_id = "list_product_categories",
     path = "/api/v1/product-categories",
     params(
-        PaginationQuery
+        PaginationQuery, ("Accept-Language" = Option<String>, Header, description = "Language code for filtering translations (e.g. 'en', 'id')"),
     ),
     responses(
         (status = 200, description = "List all product categories", body = PaginationResponse<Vec<ProductCategory>>),
@@ -49,8 +49,16 @@ pub fn category_routes() -> Router<Arc<AppState>> {
 pub async fn get_all(
     State(state): State<Arc<AppState>>,
     ValidatedQuery(query): ValidatedQuery<PaginationQuery>,
+    LanguageCode(lang): LanguageCode,
 ) -> Result<Json<PaginationResponse<Vec<ProductCategory>>>, AppError> {
-    let response = state.product_category_service.get_all(&query).await?;
+    let language_id = if let Some(code) = lang {
+        state.language_service.get_by_code(&code).await.ok().map(|l| l.id)
+    } else {
+        None
+    };
+
+    let response = state.product_category_service.get_all(&query, language_id).await?;
+    
     Ok(Json(response))
 }
 
@@ -88,14 +96,23 @@ pub async fn create(
         (status = 404, description = "Product category not found", body = ErrorResponse)
     ),
     params(
-        ("id" = Uuid, Path, description = "Product Category ID")
+        ("id" = Uuid, Path, description = "Product Category ID"),
+        ("Accept-Language" = Option<String>, Header, description = "Language code for filtering translations (e.g. 'en', 'id')"),
     )
 )]
 pub async fn get_by_id(
     State(state): State<Arc<AppState>>,
+    LanguageCode(lang): LanguageCode,
     id: Path<Uuid>,
 ) -> Result<Json<ApiResponse<ProductCategory>>, AppError> {
-    let category = state.product_category_service.get_by_id(*id).await?;
+    let language_id = if let Some(code) = lang {
+        state.language_service.get_by_code(&code).await.ok().map(|l| l.id)
+    } else {
+        None
+    };
+
+    let category = state.product_category_service.get_by_id(*id, language_id).await?;
+    
     Ok(Json(ApiResponse { data: category }))
 }
 
@@ -104,7 +121,7 @@ pub async fn get_by_id(
     operation_id = "list_product_categories_with_product_count",
     path = "/api/v1/product-categories/with-product-count",
     params(
-        PaginationQuery
+        PaginationQuery, ("Accept-Language" = Option<String>, Header, description = "Language code for filtering translations (e.g. 'en', 'id')"),
     ),
     responses(
         (status = 200, description = "List all product categories with product count", body = PaginationResponse<Vec<ProductCategory>>),
@@ -113,11 +130,19 @@ pub async fn get_by_id(
 pub async fn get_all_with_product_count(
     State(state): State<Arc<AppState>>,
     ValidatedQuery(query): ValidatedQuery<PaginationQuery>,
+    LanguageCode(lang): LanguageCode,
 ) -> Result<Json<PaginationResponse<Vec<ProductCategory>>>, AppError> {
+    let language_id = if let Some(code) = lang {
+        state.language_service.get_by_code(&code).await.ok().map(|l| l.id)
+    } else {
+        None
+    };
+
     let response = state
         .product_category_service
-        .get_all_with_product_count(&query)
+        .get_all_with_product_count(&query, language_id)
         .await?;
+    
     Ok(Json(response))
 }
 

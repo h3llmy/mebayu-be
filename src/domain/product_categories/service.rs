@@ -20,12 +20,14 @@ pub trait ProductCategoryRepository: Send + Sync {
     async fn find_all(
         &self,
         query: &PaginationQuery,
+        language_id: Option<Uuid>,
     ) -> Result<(Vec<ProductCategory>, u64), AppError>;
     async fn find_all_with_product_count(
         &self,
         query: &PaginationQuery,
+        language_id: Option<Uuid>,
     ) -> Result<(Vec<ProductCategory>, u64), AppError>;
-    async fn find_by_id(&self, id: Uuid) -> Result<ProductCategory, AppError>;
+    async fn find_by_id(&self, id: Uuid, language_id: Option<Uuid>) -> Result<ProductCategory, AppError>;
     async fn create(&self, category: &ProductCategory) -> Result<ProductCategory, AppError>;
     async fn update(
         &self,
@@ -54,8 +56,9 @@ impl ProductCategoryServiceImpl {
     pub async fn get_all(
         &self,
         query: &PaginationQuery,
+        language_id: Option<Uuid>,
     ) -> Result<PaginationResponse<Vec<ProductCategory>>, AppError> {
-        let (categories, total_data) = self.repository.find_all(query).await?;
+        let (categories, total_data) = self.repository.find_all(query, language_id).await?;
         let limit = query.get_limit();
         let total_page = (total_data as f64 / limit as f64).ceil() as u64;
 
@@ -71,8 +74,9 @@ impl ProductCategoryServiceImpl {
     pub async fn get_all_with_product_count(
         &self,
         query: &PaginationQuery,
+        language_id: Option<Uuid>,
     ) -> Result<PaginationResponse<Vec<ProductCategory>>, AppError> {
-        let (categories, total_data) = self.repository.find_all_with_product_count(query).await?;
+        let (categories, total_data) = self.repository.find_all_with_product_count(query, language_id).await?;
         let limit = query.get_limit();
         let total_page = (total_data as f64 / limit as f64).ceil() as u64;
 
@@ -85,8 +89,8 @@ impl ProductCategoryServiceImpl {
         })
     }
 
-    pub async fn get_by_id(&self, id: Uuid) -> Result<ProductCategory, AppError> {
-        self.repository.find_by_id(id).await
+    pub async fn get_by_id(&self, id: Uuid, language_id: Option<Uuid>) -> Result<ProductCategory, AppError> {
+        self.repository.find_by_id(id, language_id).await
     }
 
     pub async fn create(
@@ -102,7 +106,7 @@ impl ProductCategoryServiceImpl {
                 .find_by_code(&t_req.language_code)
                 .await?;
             translations.push(ProductCategoryTranslation {
-                category_id: id,
+                category_id: id, language: None,
                 language_id: language.id,
                 name: t_req.name,
             });
@@ -115,7 +119,8 @@ impl ProductCategoryServiceImpl {
             translations,
         };
 
-        self.repository.create(&category).await
+        self.repository.create(&category).await?;
+        self.repository.find_by_id(id, None).await
     }
 
     pub async fn update(
@@ -123,7 +128,7 @@ impl ProductCategoryServiceImpl {
         id: Uuid,
         req: UpdateProductCategoryRequest,
     ) -> Result<ProductCategory, AppError> {
-        let existing = self.repository.find_by_id(id).await?;
+        let existing = self.repository.find_by_id(id, None).await?;
         let mut translations = Vec::new();
 
         if let Some(req_translations) = req.translations {
@@ -133,7 +138,7 @@ impl ProductCategoryServiceImpl {
                     .find_by_code(&t_req.language_code)
                     .await?;
                 translations.push(ProductCategoryTranslation {
-                    category_id: id,
+                    category_id: id, language: None,
                     language_id: language.id,
                     name: t_req.name,
                 });
@@ -148,7 +153,8 @@ impl ProductCategoryServiceImpl {
             updated_at: chrono::Utc::now(),
             translations,
         };
-        self.repository.update(id, &category).await
+        self.repository.update(id, &category).await?;
+        self.repository.find_by_id(id, None).await
     }
 
     pub async fn delete(&self, id: Uuid) -> Result<(), AppError> {
@@ -177,7 +183,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             translations: vec![ProductCategoryTranslation {
-                category_id: id,
+                category_id: id, language: None,
                 language_id: test_lang_id(),
                 name: "Test Category".to_string(),
             }],
@@ -209,7 +215,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             translations: vec![ProductCategoryTranslation {
-                category_id: id,
+                category_id: id, language: None,
                 language_id: test_lang_id(),
                 name: "Test".to_string(),
             }],
@@ -274,7 +280,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             translations: vec![ProductCategoryTranslation {
-                category_id: id,
+                category_id: id, language: None,
                 language_id: lang_id,
                 name: "Old Name".to_string(),
             }],

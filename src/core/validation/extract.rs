@@ -130,3 +130,31 @@ fn map_validation_errors(err: ValidationErrors) -> AppError {
 
     AppError::Validation(errors)
 }
+
+//
+// ============================================================
+// LANGUAGE HEADER EXTRACTION
+// ============================================================
+//
+
+pub struct LanguageCode(pub Option<String>);
+
+impl<S> FromRequestParts<S> for LanguageCode
+where
+    S: Send + Sync,
+{
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Self, Self::Rejection> {
+        let lang = parts
+            .headers
+            .get("accept-language")
+            .and_then(|h| h.to_str().ok())
+            .map(|s| {
+                // Take only the first part of accept-language if it contains multiple
+                s.split(',').next().unwrap_or(s).split(';').next().unwrap_or(s).trim().to_string()
+            });
+
+        Ok(LanguageCode(lang))
+    }
+}

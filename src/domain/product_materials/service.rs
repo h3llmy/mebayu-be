@@ -20,8 +20,9 @@ pub trait ProductMaterialRepository: Send + Sync {
     async fn find_all(
         &self,
         query: &PaginationQuery,
+        language_id: Option<Uuid>,
     ) -> Result<(Vec<ProductMaterial>, u64), AppError>;
-    async fn find_by_id(&self, id: Uuid) -> Result<ProductMaterial, AppError>;
+    async fn find_by_id(&self, id: Uuid, language_id: Option<Uuid>) -> Result<ProductMaterial, AppError>;
     async fn create(&self, material: &ProductMaterial) -> Result<ProductMaterial, AppError>;
     async fn update(
         &self,
@@ -50,8 +51,9 @@ impl ProductMaterialServiceImpl {
     pub async fn get_all(
         &self,
         query: &PaginationQuery,
+        language_id: Option<Uuid>,
     ) -> Result<PaginationResponse<Vec<ProductMaterial>>, AppError> {
-        let (materials, total_data) = self.repository.find_all(query).await?;
+        let (materials, total_data) = self.repository.find_all(query, language_id).await?;
         let limit = query.get_limit();
         let total_page = (total_data as f64 / limit as f64).ceil() as u64;
 
@@ -64,8 +66,8 @@ impl ProductMaterialServiceImpl {
         })
     }
 
-    pub async fn get_by_id(&self, id: Uuid) -> Result<ProductMaterial, AppError> {
-        self.repository.find_by_id(id).await
+    pub async fn get_by_id(&self, id: Uuid, language_id: Option<Uuid>) -> Result<ProductMaterial, AppError> {
+        self.repository.find_by_id(id, language_id).await
     }
 
     pub async fn create(
@@ -81,7 +83,7 @@ impl ProductMaterialServiceImpl {
                 .find_by_code(&t_req.language_code)
                 .await?;
             translations.push(ProductMaterialTranslation {
-                material_id: id,
+                material_id: id, language: None,
                 language_id: language.id,
                 name: t_req.name,
             });
@@ -94,7 +96,8 @@ impl ProductMaterialServiceImpl {
             translations,
         };
 
-        self.repository.create(&material).await
+        self.repository.create(&material).await?;
+        self.repository.find_by_id(id, None).await
     }
 
     pub async fn update(
@@ -102,7 +105,7 @@ impl ProductMaterialServiceImpl {
         id: Uuid,
         req: UpdateProductMaterialRequest,
     ) -> Result<ProductMaterial, AppError> {
-        let existing = self.repository.find_by_id(id).await?;
+        let existing = self.repository.find_by_id(id, None).await?;
         let mut translations = Vec::new();
 
         if let Some(req_translations) = req.translations {
@@ -112,7 +115,7 @@ impl ProductMaterialServiceImpl {
                     .find_by_code(&t_req.language_code)
                     .await?;
                 translations.push(ProductMaterialTranslation {
-                    material_id: id,
+                    material_id: id, language: None,
                     language_id: language.id,
                     name: t_req.name,
                 });
@@ -127,7 +130,8 @@ impl ProductMaterialServiceImpl {
             updated_at: chrono::Utc::now(),
             translations,
         };
-        self.repository.update(id, &material).await
+        self.repository.update(id, &material).await?;
+        self.repository.find_by_id(id, None).await
     }
 
     pub async fn delete(&self, id: Uuid) -> Result<(), AppError> {
@@ -156,7 +160,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             translations: vec![ProductMaterialTranslation {
-                material_id: id,
+                material_id: id, language: None,
                 language_id: test_lang_id(),
                 name: "Test Material".to_string(),
             }],
@@ -188,7 +192,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             translations: vec![ProductMaterialTranslation {
-                material_id: id,
+                material_id: id, language: None,
                 language_id: test_lang_id(),
                 name: "Test".to_string(),
             }],
@@ -253,7 +257,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             translations: vec![ProductMaterialTranslation {
-                material_id: id,
+                material_id: id, language: None,
                 language_id: lang_id,
                 name: "Old Name".to_string(),
             }],

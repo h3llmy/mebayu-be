@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO product_material_translations (material_id, language_id, name, description) VALUES ($1, $2, 'Gold 18k', 'High-quality 18k gold.')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3c2655b99da5b2dd29e215ef1029f79f21a3bf0bdb8ac11ff5ab1ac0db4371a8"
+}

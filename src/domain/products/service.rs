@@ -14,9 +14,18 @@ use super::entity::{Product, ProductImage, ProductTranslation};
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait ProductRepository: Send + Sync {
-    async fn find_all(&self, query: &GetProductsQuery) -> Result<(Vec<Product>, u64), AppError>;
-    async fn find_by_id(&self, id: Uuid) -> Result<Product, AppError>;
-    async fn find_recommendations(&self, id: Uuid, limit: i64) -> Result<Vec<Product>, AppError>;
+    async fn find_all(
+        &self,
+        query: &GetProductsQuery,
+        language_id: Option<Uuid>,
+    ) -> Result<(Vec<Product>, u64), AppError>;
+    async fn find_by_id(&self, id: Uuid, language_id: Option<Uuid>) -> Result<Product, AppError>;
+    async fn find_recommendations(
+        &self,
+        id: Uuid,
+        limit: i64,
+        language_id: Option<Uuid>,
+    ) -> Result<Vec<Product>, AppError>;
     async fn create(&self, product: &Product) -> Result<Product, AppError>;
     async fn update(&self, id: Uuid, product: &Product) -> Result<Product, AppError>;
     async fn delete(&self, id: Uuid) -> Result<(), AppError>;
@@ -38,8 +47,9 @@ impl ProductServiceImpl {
     pub async fn get_all(
         &self,
         query: &GetProductsQuery,
+        language_id: Option<Uuid>,
     ) -> Result<PaginationResponse<Vec<Product>>, AppError> {
-        let (products, total_data) = self.repository.find_all(query).await?;
+        let (products, total_data) = self.repository.find_all(query, language_id).await?;
         let limit = query.pagination.get_limit();
         let total_page = (total_data as f64 / limit as f64).ceil() as u64;
 
@@ -52,8 +62,8 @@ impl ProductServiceImpl {
         })
     }
 
-    pub async fn get_by_id(&self, id: Uuid) -> Result<Product, AppError> {
-        self.repository.find_by_id(id).await
+    pub async fn get_by_id(&self, id: Uuid, language_id: Option<Uuid>) -> Result<Product, AppError> {
+        self.repository.find_by_id(id, language_id).await
     }
 
     pub async fn create(&self, req: CreateProductRequest) -> Result<Product, AppError> {
@@ -86,14 +96,15 @@ impl ProductServiceImpl {
                 })
                 .collect(),
             translations: req.translations.into_iter().map(|t| ProductTranslation {
-                product_id: id,
+                product_id: id, language: None,
                 language_id: t.language_id,
                 name: t.name,
                 description: t.description,
             }).collect(),
         };
 
-        self.repository.create(&product).await
+        self.repository.create(&product).await?;
+        self.repository.find_by_id(id, None).await
     }
 
     pub async fn update(&self, id: Uuid, req: UpdateProductRequest) -> Result<Product, AppError> {
@@ -103,7 +114,7 @@ impl ProductServiceImpl {
             }
         }
 
-        let product = self.repository.find_by_id(id).await?;
+        let product = self.repository.find_by_id(id, None).await?;
         let updated_product = Product {
             id,
             category_ids: req.category_ids.unwrap_or(product.category_ids),
@@ -132,7 +143,7 @@ impl ProductServiceImpl {
                 .unwrap_or(product.images),
             translations: req.translations.map(|trs| {
                 trs.into_iter().map(|t| ProductTranslation {
-                    product_id: id,
+                    product_id: id, language: None,
                     language_id: t.language_id,
                     name: t.name,
                     description: t.description,
@@ -140,17 +151,19 @@ impl ProductServiceImpl {
             }).unwrap_or(product.translations),
         };
 
-        self.repository.update(id, &updated_product).await
+        self.repository.update(id, &updated_product).await?;
+        self.repository.find_by_id(id, None).await
     }
 
     pub async fn get_recommendations(
         &self,
         id: Uuid,
         limit: Option<i64>,
+        language_id: Option<Uuid>,
     ) -> Result<Vec<Product>, AppError> {
-        self.repository.find_by_id(id).await?;
+        self.repository.find_by_id(id, language_id).await?;
         let limit = limit.unwrap_or(8).min(50).max(1);
-        self.repository.find_recommendations(id, limit).await
+        self.repository.find_recommendations(id, limit, language_id).await
     }
 
     pub async fn delete(&self, id: Uuid) -> Result<(), AppError> {
@@ -187,7 +200,7 @@ mod tests {
             product_foundations: vec![],
             images: vec![],
             translations: vec![ProductTranslation {
-                product_id: id,
+                product_id: id, language: None,
                 language_id: test_lang_id(),
                 name: "Test Product".to_string(),
                 description: "Desc".to_string(),
@@ -229,7 +242,7 @@ mod tests {
             product_foundations: vec![],
             images: vec![],
             translations: vec![ProductTranslation {
-                product_id: id,
+                product_id: id, language: None,
                 language_id: test_lang_id(),
                 name: "Test".to_string(),
                 description: "Desc".to_string(),

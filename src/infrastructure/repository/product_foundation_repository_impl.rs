@@ -1,3 +1,4 @@
+use crate::domain::languages::entity::Language;
 use async_trait::async_trait;
 
 use sqlx::PgPool;
@@ -27,10 +28,19 @@ impl ProductFoundationRepository for ProductFoundationRepositoryImpl {
     async fn find_all(
         &self,
         query: &PaginationQuery,
+        language_id: Option<Uuid>,
     ) -> Result<(Vec<ProductFoundation>, u64), AppError> {
         let limit = query.get_limit() as i64;
         let offset = query.get_offset();
         let search = query.get_search().map(|s| format!("%{}%", s));
+
+        let languages = sqlx::query_as!(
+            Language,
+            "SELECT id, code, name, is_default, created_at, updated_at FROM languages"
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
         let rows = sqlx::query!(
             r#"
@@ -55,14 +65,24 @@ impl ProductFoundationRepository for ProductFoundationRepositoryImpl {
         
         let mut foundations = Vec::new();
         for row in rows {
-            let translations = sqlx::query_as!(
-                ProductFoundationTranslation,
-                "SELECT foundation_id, language_id, name FROM product_foundation_translations WHERE foundation_id = $1",
-                row.id
+            let translation_rows = sqlx::query!(
+                "SELECT foundation_id, language_id, name FROM product_foundation_translations 
+                 WHERE foundation_id = $1 AND ($2::uuid IS NULL OR language_id = $2)",
+                row.id,
+                language_id
             )
             .fetch_all(&self.pool)
             .await
             .map_err(|e| AppError::Database(e.to_string()))?;
+
+            let translations: Vec<ProductFoundationTranslation> = translation_rows.into_iter().map(|t_row| {
+                ProductFoundationTranslation {
+                    foundation_id: t_row.foundation_id,
+                    language_id: t_row.language_id,
+                    language: languages.iter().find(|l| l.id == t_row.language_id).cloned(),
+                    name: t_row.name,
+                }
+            }).collect();
 
             foundations.push(ProductFoundation {
                 id: row.id,
@@ -75,7 +95,7 @@ impl ProductFoundationRepository for ProductFoundationRepositoryImpl {
         Ok((foundations, total as u64))
     }
 
-    async fn find_by_id(&self, id: Uuid) -> Result<ProductFoundation, AppError> {
+    async fn find_by_id(&self, id: Uuid, language_id: Option<Uuid>) -> Result<ProductFoundation, AppError> {
         let row = sqlx::query!(
             "SELECT id, created_at, updated_at FROM product_foundations WHERE id = $1",
             id
@@ -85,14 +105,32 @@ impl ProductFoundationRepository for ProductFoundationRepositoryImpl {
         .map_err(|e| AppError::Database(e.to_string()))?
         .ok_or_else(|| AppError::NotFound("Foundation not found".to_string()))?;
 
-        let translations = sqlx::query_as!(
-            ProductFoundationTranslation,
-            "SELECT foundation_id, language_id, name FROM product_foundation_translations WHERE foundation_id = $1",
-            id
+        let languages = sqlx::query_as!(
+            Language,
+            "SELECT id, code, name, is_default, created_at, updated_at FROM languages"
         )
         .fetch_all(&self.pool)
         .await
         .map_err(|e| AppError::Database(e.to_string()))?;
+
+        let translation_rows = sqlx::query!(
+            "SELECT foundation_id, language_id, name FROM product_foundation_translations 
+             WHERE foundation_id = $1 AND ($2::uuid IS NULL OR language_id = $2)",
+            id,
+            language_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+        let translations: Vec<ProductFoundationTranslation> = translation_rows.into_iter().map(|t_row| {
+            ProductFoundationTranslation {
+                foundation_id: t_row.foundation_id,
+                language_id: t_row.language_id,
+                language: languages.iter().find(|l| l.id == t_row.language_id).cloned(),
+                name: t_row.name,
+            }
+        }).collect();
 
         Ok(ProductFoundation {
             id: row.id,
@@ -129,7 +167,7 @@ impl ProductFoundationRepository for ProductFoundationRepositoryImpl {
 
         tx.commit().await.map_err(|e| AppError::Database(e.to_string()))?;
 
-        self.find_by_id(foundation.id).await
+        self.find_by_id(foundation.id, None).await
     }
 
     async fn update(
@@ -167,7 +205,7 @@ impl ProductFoundationRepository for ProductFoundationRepositoryImpl {
 
         tx.commit().await.map_err(|e| AppError::Database(e.to_string()))?;
 
-        self.find_by_id(id).await
+        self.find_by_id(id, None).await
     }
 
     async fn delete(&self, id: Uuid) -> Result<(), AppError> {
@@ -223,7 +261,7 @@ mod tests {
         let created = repo.create(&foundation).await.unwrap();
         assert_eq!(created.translations[0].name, "Foundation A");
 
-        let found = repo.find_by_id(foundation.id).await.unwrap();
+        let found = repo.find_by_id(foundation.id, None).await.unwrap();
         assert_eq!(found.id, foundation.id);
         assert_eq!(found.translations[0].name, "Foundation A");
     }
@@ -239,7 +277,7 @@ mod tests {
 
         let query = PaginationQuery::default();
 
-        let (items, total) = repo.find_all(&query).await.unwrap();
+        let (items, total) = repo.find_all(&query, None).await.unwrap();
         assert_eq!(total, 3);
         assert_eq!(items.len(), 3);
     }

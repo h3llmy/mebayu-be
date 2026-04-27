@@ -1,8 +1,11 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
 use utoipa::ToSchema;
 use uuid::Uuid;
+ 
+use crate::domain::languages::entity::Language;
+
+use crate::shared::traits::Translatable;
 
 #[derive(Clone, Serialize, Deserialize, ToSchema)]
 pub struct ProductMaterial {
@@ -12,9 +15,16 @@ pub struct ProductMaterial {
     pub translations: Vec<ProductMaterialTranslation>,
 }
 
-#[derive(Clone, Serialize, Deserialize, FromRow, ToSchema)]
+impl Translatable for ProductMaterial {
+    fn filter_by_language(&mut self, language_id: Uuid) {
+        self.translations.retain(|t| t.language_id == language_id);
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, ToSchema)]
 pub struct ProductMaterialTranslation {
     pub material_id: Uuid,
     pub language_id: Uuid,
+    pub language: Option<Language>,
     pub name: String,
 }

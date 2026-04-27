@@ -10,7 +10,7 @@ use crate::{
     core::{
         error::{AppError, ErrorResponse},
         middleware::auth::AuthUser,
-        validation::{ValidatedJson, ValidatedQuery},
+        validation::{ValidatedJson, ValidatedQuery, LanguageCode},
     },
     domain::{
         products::{
@@ -45,6 +45,7 @@ pub fn product_routes() -> Router<Arc<AppState>> {
         ("category_id" = Option<Uuid>, Query, description = "Filter by category ID"),
         ("material_id" = Option<Uuid>, Query, description = "Filter by material ID"),
         ("foundation_id" = Option<Uuid>, Query, description = "Filter by foundation ID"),
+        ("Accept-Language" = Option<String>, Header, description = "Language code for filtering translations (e.g. 'en', 'id')"),
     ),
     responses(
         (status = 200, description = "List all products", body = PaginationResponse<Vec<Product>>),
@@ -53,8 +54,16 @@ pub fn product_routes() -> Router<Arc<AppState>> {
 pub async fn get_all(
     State(state): State<Arc<AppState>>,
     ValidatedQuery(query): ValidatedQuery<GetProductsQuery>,
+    LanguageCode(lang): LanguageCode,
 ) -> Result<Json<PaginationResponse<Vec<Product>>>, AppError> {
-    let response = state.product_service.get_all(&query).await?;
+    let language_id = if let Some(code) = lang {
+        state.language_service.get_by_code(&code).await.ok().map(|l| l.id)
+    } else {
+        None
+    };
+
+    let response = state.product_service.get_all(&query, language_id).await?;
+    
     Ok(Json(response))
 }
 
@@ -92,14 +101,23 @@ pub async fn create(
         (status = 404, description = "Product not found", body = ErrorResponse)
     ),
     params(
-        ("id" = Uuid, Path, description = "Product ID")
+        ("id" = Uuid, Path, description = "Product ID"),
+        ("Accept-Language" = Option<String>, Header, description = "Language code for filtering translations (e.g. 'en', 'id')"),
     )
 )]
 pub async fn get_by_id(
     State(state): State<Arc<AppState>>,
+    LanguageCode(lang): LanguageCode,
     id: Path<Uuid>,
 ) -> Result<Json<ApiResponse<Product>>, AppError> {
-    let product = state.product_service.get_by_id(*id).await?;
+    let language_id = if let Some(code) = lang {
+        state.language_service.get_by_code(&code).await.ok().map(|l| l.id)
+    } else {
+        None
+    };
+
+    let product = state.product_service.get_by_id(*id, language_id).await?;
+    
     Ok(Json(ApiResponse { data: product }))
 }
 
@@ -171,7 +189,8 @@ pub struct RecommendationsQuery {
     path = "/api/v1/products/{id}/recommendations",
     params(
         ("id" = Uuid, Path, description = "Product ID"),
-        ("limit" = Option<i64>, Query, description = "Max number of recommendations to return (default 8, max 50)")
+        ("limit" = Option<i64>, Query, description = "Max number of recommendations to return (default 8, max 50)"),
+        ("Accept-Language" = Option<String>, Header, description = "Language code for filtering translations (e.g. 'en', 'id')"),
     ),
     responses(
         (status = 200, description = "Product recommendations", body = ApiResponse<Vec<Product>>),
@@ -180,12 +199,20 @@ pub struct RecommendationsQuery {
 )]
 pub async fn get_recommendations(
     State(state): State<Arc<AppState>>,
+    LanguageCode(lang): LanguageCode,
     id: Path<Uuid>,
     Query(query): Query<RecommendationsQuery>,
 ) -> Result<Json<ApiResponse<Vec<Product>>>, AppError> {
+    let language_id = if let Some(code) = lang {
+        state.language_service.get_by_code(&code).await.ok().map(|l| l.id)
+    } else {
+        None
+    };
+
     let products = state
         .product_service
-        .get_recommendations(*id, query.limit)
+        .get_recommendations(*id, query.limit, language_id)
         .await?;
+    
     Ok(Json(ApiResponse { data: products }))
 }

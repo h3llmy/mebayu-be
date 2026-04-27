@@ -1,3 +1,4 @@
+use crate::domain::languages::entity::Language;
 use async_trait::async_trait;
 
 use sqlx::PgPool;
@@ -27,10 +28,19 @@ impl ProductCategoryRepository for ProductCategoryRepositoryImpl {
     async fn find_all(
         &self,
         query: &PaginationQuery,
+        language_id: Option<Uuid>,
     ) -> Result<(Vec<ProductCategory>, u64), AppError> {
         let limit = query.get_limit() as i64;
         let offset = query.get_offset();
         let search = query.get_search().map(|s| format!("%{}%", s));
+
+        let languages = sqlx::query_as!(
+            Language,
+            "SELECT id, code, name, is_default, created_at, updated_at FROM languages"
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
         let rows = sqlx::query!(
             r#"
@@ -55,14 +65,24 @@ impl ProductCategoryRepository for ProductCategoryRepositoryImpl {
         
         let mut categories = Vec::new();
         for row in rows {
-            let translations = sqlx::query_as!(
-                ProductCategoryTranslation,
-                "SELECT category_id, language_id, name FROM product_category_translations WHERE category_id = $1",
-                row.id
+            let translation_rows = sqlx::query!(
+                "SELECT category_id, language_id, name FROM product_category_translations 
+                 WHERE category_id = $1 AND ($2::uuid IS NULL OR language_id = $2)",
+                row.id,
+                language_id
             )
             .fetch_all(&self.pool)
             .await
             .map_err(|e| AppError::Database(e.to_string()))?;
+
+            let translations: Vec<ProductCategoryTranslation> = translation_rows.into_iter().map(|t_row| {
+                ProductCategoryTranslation {
+                    category_id: t_row.category_id,
+                    language_id: t_row.language_id,
+                    language: languages.iter().find(|l| l.id == t_row.language_id).cloned(),
+                    name: t_row.name,
+                }
+            }).collect();
 
             categories.push(ProductCategory {
                 id: row.id,
@@ -78,12 +98,13 @@ impl ProductCategoryRepository for ProductCategoryRepositoryImpl {
     async fn find_all_with_product_count(
         &self,
         query: &PaginationQuery,
+        language_id: Option<Uuid>,
     ) -> Result<(Vec<ProductCategory>, u64), AppError> {
         // Reuse find_all for now, or implement product count logic if needed
-        self.find_all(query).await
+        self.find_all(query, language_id).await
     }
 
-    async fn find_by_id(&self, id: Uuid) -> Result<ProductCategory, AppError> {
+    async fn find_by_id(&self, id: Uuid, language_id: Option<Uuid>) -> Result<ProductCategory, AppError> {
         let row = sqlx::query!(
             "SELECT id, created_at, updated_at FROM product_categories WHERE id = $1",
             id
@@ -93,14 +114,32 @@ impl ProductCategoryRepository for ProductCategoryRepositoryImpl {
         .map_err(|e| AppError::Database(e.to_string()))?
         .ok_or_else(|| AppError::NotFound("Product category not found".to_string()))?;
 
-        let translations = sqlx::query_as!(
-            ProductCategoryTranslation,
-            "SELECT category_id, language_id, name FROM product_category_translations WHERE category_id = $1",
-            id
+        let languages = sqlx::query_as!(
+            Language,
+            "SELECT id, code, name, is_default, created_at, updated_at FROM languages"
         )
         .fetch_all(&self.pool)
         .await
         .map_err(|e| AppError::Database(e.to_string()))?;
+
+        let translation_rows = sqlx::query!(
+            "SELECT category_id, language_id, name FROM product_category_translations 
+             WHERE category_id = $1 AND ($2::uuid IS NULL OR language_id = $2)",
+            id,
+            language_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+        let translations: Vec<ProductCategoryTranslation> = translation_rows.into_iter().map(|t_row| {
+            ProductCategoryTranslation {
+                category_id: t_row.category_id,
+                language_id: t_row.language_id,
+                language: languages.iter().find(|l| l.id == t_row.language_id).cloned(),
+                name: t_row.name,
+            }
+        }).collect();
 
         Ok(ProductCategory {
             id: row.id,
@@ -137,7 +176,7 @@ impl ProductCategoryRepository for ProductCategoryRepositoryImpl {
 
         tx.commit().await.map_err(|e| AppError::Database(e.to_string()))?;
 
-        self.find_by_id(category.id).await
+        self.find_by_id(category.id, None).await
     }
 
     async fn update(
@@ -175,7 +214,7 @@ impl ProductCategoryRepository for ProductCategoryRepositoryImpl {
 
         tx.commit().await.map_err(|e| AppError::Database(e.to_string()))?;
 
-        self.find_by_id(id).await
+        self.find_by_id(id, None).await
     }
 
     async fn delete(&self, id: Uuid) -> Result<(), AppError> {
@@ -239,7 +278,7 @@ mod tests {
         let created = repo.create(&category).await.unwrap();
         assert_eq!(created.translations[0].name, "Electronics");
 
-        let found = repo.find_by_id(category.id).await.unwrap();
+        let found = repo.find_by_id(category.id, None).await.unwrap();
         assert_eq!(found.id, category.id);
         assert_eq!(found.translations[0].name, "Electronics");
     }
@@ -249,7 +288,7 @@ mod tests {
         setup_db(&pool).await;
         let repo = ProductCategoryRepositoryImpl::new(pool.clone());
 
-        let result = repo.find_by_id(Uuid::new_v4()).await;
+        let result = repo.find_by_id(Uuid::new_v4(), None).await;
         assert!(result.is_err());
     }
 
@@ -272,7 +311,7 @@ mod tests {
             sort_order: None,
         };
 
-        let (items, total) = repo.find_all(&query).await.unwrap();
+        let (items, total) = repo.find_all(&query, None).await.unwrap();
 
         assert_eq!(total, 3);
         assert_eq!(items.len(), 3);
@@ -303,7 +342,7 @@ mod tests {
 
         repo.delete(category.id).await.unwrap();
 
-        let result = repo.find_by_id(category.id).await;
+        let result = repo.find_by_id(category.id, None).await;
         assert!(result.is_err());
     }
 }

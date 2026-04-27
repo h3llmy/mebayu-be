@@ -1,3 +1,4 @@
+use crate::domain::languages::entity::Language;
 use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -27,10 +28,19 @@ impl ProductMaterialRepository for ProductMaterialRepositoryImpl {
     async fn find_all(
         &self,
         query: &PaginationQuery,
+        language_id: Option<Uuid>,
     ) -> Result<(Vec<ProductMaterial>, u64), AppError> {
         let limit = query.get_limit() as i64;
         let offset = query.get_offset();
         let search = query.get_search().map(|s| format!("%{}%", s));
+
+        let languages = sqlx::query_as!(
+            Language,
+            "SELECT id, code, name, is_default, created_at, updated_at FROM languages"
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
         let rows = sqlx::query!(
             r#"
@@ -55,14 +65,24 @@ impl ProductMaterialRepository for ProductMaterialRepositoryImpl {
         
         let mut materials = Vec::new();
         for row in rows {
-            let translations = sqlx::query_as!(
-                ProductMaterialTranslation,
-                "SELECT material_id, language_id, name FROM product_material_translations WHERE material_id = $1",
-                row.id
+            let translation_rows = sqlx::query!(
+                "SELECT material_id, language_id, name FROM product_material_translations 
+                 WHERE material_id = $1 AND ($2::uuid IS NULL OR language_id = $2)",
+                row.id,
+                language_id
             )
             .fetch_all(&self.pool)
             .await
             .map_err(|e| AppError::Database(e.to_string()))?;
+
+            let translations: Vec<ProductMaterialTranslation> = translation_rows.into_iter().map(|t_row| {
+                ProductMaterialTranslation {
+                    material_id: t_row.material_id,
+                    language_id: t_row.language_id,
+                    language: languages.iter().find(|l| l.id == t_row.language_id).cloned(),
+                    name: t_row.name,
+                }
+            }).collect();
 
             materials.push(ProductMaterial {
                 id: row.id,
@@ -75,7 +95,7 @@ impl ProductMaterialRepository for ProductMaterialRepositoryImpl {
         Ok((materials, total as u64))
     }
 
-    async fn find_by_id(&self, id: Uuid) -> Result<ProductMaterial, AppError> {
+    async fn find_by_id(&self, id: Uuid, language_id: Option<Uuid>) -> Result<ProductMaterial, AppError> {
         let row = sqlx::query!(
             "SELECT id, created_at, updated_at FROM product_materials WHERE id = $1",
             id
@@ -85,14 +105,32 @@ impl ProductMaterialRepository for ProductMaterialRepositoryImpl {
         .map_err(|e| AppError::Database(e.to_string()))?
         .ok_or_else(|| AppError::NotFound("Product material not found".to_string()))?;
 
-        let translations = sqlx::query_as!(
-            ProductMaterialTranslation,
-            "SELECT material_id, language_id, name FROM product_material_translations WHERE material_id = $1",
-            id
+        let languages = sqlx::query_as!(
+            Language,
+            "SELECT id, code, name, is_default, created_at, updated_at FROM languages"
         )
         .fetch_all(&self.pool)
         .await
         .map_err(|e| AppError::Database(e.to_string()))?;
+
+        let translation_rows = sqlx::query!(
+            "SELECT material_id, language_id, name FROM product_material_translations 
+             WHERE material_id = $1 AND ($2::uuid IS NULL OR language_id = $2)",
+            id,
+            language_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+        let translations: Vec<ProductMaterialTranslation> = translation_rows.into_iter().map(|t_row| {
+            ProductMaterialTranslation {
+                material_id: t_row.material_id,
+                language_id: t_row.language_id,
+                language: languages.iter().find(|l| l.id == t_row.language_id).cloned(),
+                name: t_row.name,
+            }
+        }).collect();
 
         Ok(ProductMaterial {
             id: row.id,
@@ -129,7 +167,7 @@ impl ProductMaterialRepository for ProductMaterialRepositoryImpl {
 
         tx.commit().await.map_err(|e| AppError::Database(e.to_string()))?;
 
-        self.find_by_id(material.id).await
+        self.find_by_id(material.id, None).await
     }
 
     async fn update(
@@ -167,7 +205,7 @@ impl ProductMaterialRepository for ProductMaterialRepositoryImpl {
 
         tx.commit().await.map_err(|e| AppError::Database(e.to_string()))?;
 
-        self.find_by_id(id).await
+        self.find_by_id(id, None).await
     }
 
     async fn delete(&self, id: Uuid) -> Result<(), AppError> {
@@ -231,7 +269,7 @@ mod tests {
         let created = repo.create(&material).await.unwrap();
         assert_eq!(created.translations[0].name, "Steel");
 
-        let found = repo.find_by_id(material.id).await.unwrap();
+        let found = repo.find_by_id(material.id, None).await.unwrap();
         assert_eq!(found.id, material.id);
         assert_eq!(found.translations[0].name, "Steel");
     }
@@ -241,7 +279,7 @@ mod tests {
         setup_db(&pool).await;
         let repo = ProductMaterialRepositoryImpl::new(pool.clone());
 
-        let result = repo.find_by_id(Uuid::new_v4()).await;
+        let result = repo.find_by_id(Uuid::new_v4(), None).await;
         assert!(result.is_err());
     }
 
@@ -264,7 +302,7 @@ mod tests {
             sort_order: None,
         };
 
-        let (items, total) = repo.find_all(&query).await.unwrap();
+        let (items, total) = repo.find_all(&query, None).await.unwrap();
 
         assert_eq!(total, 3);
         assert_eq!(items.len(), 3);
@@ -295,7 +333,7 @@ mod tests {
 
         repo.delete(material.id).await.unwrap();
 
-        let result = repo.find_by_id(material.id).await;
+        let result = repo.find_by_id(material.id, None).await;
         assert!(result.is_err());
     }
 }

@@ -18,17 +18,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Connected! Starting data seed...");
 
     // 1. Language
-    let lang_id = Uuid::new_v4();
     sqlx::query!(
-        "INSERT INTO languages (id, code, name, is_default) VALUES ($1, 'en', 'English', true) ON CONFLICT (code) DO UPDATE SET is_default = true RETURNING id",
-        lang_id
-    ).fetch_one(&pool).await?;
+        "INSERT INTO languages (id, code, name, is_default) VALUES ($1, 'en', 'English', true) ON CONFLICT (code) DO NOTHING",
+        Uuid::new_v4()
+    ).execute(&pool).await?;
 
-    // Get the actual lang_id (if we hit a conflict, we still need an ID, so let's just query it)
-    let lang_record = sqlx::query!("SELECT id FROM languages WHERE code = 'en'").fetch_one(&pool).await?;
-    let active_lang = lang_record.id;
+    sqlx::query!(
+        "INSERT INTO languages (id, code, name, is_default) VALUES ($1, 'id', 'Indonesian', false) ON CONFLICT (code) DO NOTHING",
+        Uuid::new_v4()
+    ).execute(&pool).await?;
 
-    println!("Language seeded with ID: {}", active_lang);
+    let en_id = sqlx::query!("SELECT id FROM languages WHERE code = 'en'").fetch_one(&pool).await?.id;
+    let id_id = sqlx::query!("SELECT id FROM languages WHERE code = 'id'").fetch_one(&pool).await?.id;
+
+    println!("Languages seeded: English ({}) and Indonesian ({})", en_id, id_id);
 
     // 2. Clear old data
     println!("Clearing existing test mappings (relations)...");
@@ -51,27 +54,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cat_id = Uuid::new_v4();
     let now = Utc::now();
     sqlx::query!("INSERT INTO product_categories (id, created_at, updated_at) VALUES ($1, $2, $3)", cat_id, now, now).execute(&pool).await?;
-    sqlx::query!("INSERT INTO product_category_translations (category_id, language_id, name) VALUES ($1, $2, 'Necklaces')", cat_id, active_lang).execute(&pool).await?;
+    sqlx::query!("INSERT INTO product_category_translations (category_id, language_id, name, description) VALUES ($1, $2, 'Necklaces', 'Elegant necklaces for all occasions.')", cat_id, en_id).execute(&pool).await?;
+    sqlx::query!("INSERT INTO product_category_translations (category_id, language_id, name, description) VALUES ($1, $2, 'Kalung', 'Kalung elegan untuk berbagai acara.')", cat_id, id_id).execute(&pool).await?;
 
     // 4. Material
     let mat_id = Uuid::new_v4();
     sqlx::query!("INSERT INTO product_materials (id, created_at, updated_at) VALUES ($1, $2, $3)", mat_id, now, now).execute(&pool).await?;
-    sqlx::query!("INSERT INTO product_material_translations (material_id, language_id, name) VALUES ($1, $2, 'Gold 18k')", mat_id, active_lang).execute(&pool).await?;
+    sqlx::query!("INSERT INTO product_material_translations (material_id, language_id, name, description) VALUES ($1, $2, 'Gold 18k', 'High-quality 18k gold.')", mat_id, en_id).execute(&pool).await?;
+    sqlx::query!("INSERT INTO product_material_translations (material_id, language_id, name, description) VALUES ($1, $2, 'Emas 18k', 'Emas 18k berkualitas tinggi.')", mat_id, id_id).execute(&pool).await?;
 
     // 5. Foundation
     let found_id = Uuid::new_v4();
     sqlx::query!("INSERT INTO product_foundations (id, created_at, updated_at) VALUES ($1, $2, $3)", found_id, now, now).execute(&pool).await?;
-    sqlx::query!("INSERT INTO product_foundation_translations (foundation_id, language_id, name) VALUES ($1, $2, 'Solid')", found_id, active_lang).execute(&pool).await?;
+    sqlx::query!("INSERT INTO product_foundation_translations (foundation_id, language_id, name, description) VALUES ($1, $2, 'Solid', 'Strong and durable foundation.')", found_id, en_id).execute(&pool).await?;
+    sqlx::query!("INSERT INTO product_foundation_translations (foundation_id, language_id, name, description) VALUES ($1, $2, 'Padat', 'Pondasi yang kuat dan tahan lama.')", found_id, id_id).execute(&pool).await?;
 
     // 6. Product
     let prod_id = Uuid::new_v4();
     sqlx::query!("INSERT INTO products (id, price, status, created_at, updated_at) VALUES ($1, 299.99, 'published', $2, $3)", prod_id, now, now).execute(&pool).await?;
-    sqlx::query!("INSERT INTO product_translations (product_id, language_id, name, description) VALUES ($1, $2, 'Elara Gold Chain', 'A beautiful 18k gold chain.')", prod_id, active_lang).execute(&pool).await?;
+    sqlx::query!("INSERT INTO product_translations (product_id, language_id, name, description) VALUES ($1, $2, 'Elara Gold Chain', 'A beautiful 18k gold chain.')", prod_id, en_id).execute(&pool).await?;
+    sqlx::query!("INSERT INTO product_translations (product_id, language_id, name, description) VALUES ($1, $2, 'Rantai Emas Elara', 'Rantai emas 18k yang indah.')", prod_id, id_id).execute(&pool).await?;
 
     // 7. Relations
     sqlx::query!("INSERT INTO product_category_relations (product_id, category_id) VALUES ($1, $2)", prod_id, cat_id).execute(&pool).await?;
     sqlx::query!("INSERT INTO product_material_relations (product_id, material_id) VALUES ($1, $2)", prod_id, mat_id).execute(&pool).await?;
     sqlx::query!("INSERT INTO product_foundation_relations (product_id, foundation_id) VALUES ($1, $2)", prod_id, found_id).execute(&pool).await?;
+
 
     // 8. Product Image
     sqlx::query!("INSERT INTO product_images (id, product_id, url, created_at, updated_at) VALUES ($1, $2, 'https://s3.dwikihome.my.id/mebayu/products/9750b53f-c901-4c7a-b2bb-cca4d986d091.jpg', $3, $4)", Uuid::new_v4(), prod_id, now, now).execute(&pool).await?;

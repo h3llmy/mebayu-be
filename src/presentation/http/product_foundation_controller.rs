@@ -10,7 +10,7 @@ use crate::{
     core::{
         error::{AppError, ErrorResponse},
         middleware::auth::AuthUser,
-        validation::{ValidatedJson, ValidatedQuery},
+        validation::{ValidatedJson, ValidatedQuery, LanguageCode},
     },
     domain::{
         product_foundations::{
@@ -38,7 +38,10 @@ pub fn foundation_routes() -> Router<Arc<AppState>> {
     get,
     operation_id = "list_foundations",
     path = "/api/v1/product-foundations",
-    params(PaginationQuery),
+    params(
+        PaginationQuery,
+        ("Accept-Language" = Option<String>, Header, description = "Language code for filtering translations (e.g. 'en', 'id')"),
+    ),
     responses(
         (status = 200, description = "List all foundations", body = PaginationResponse<Vec<ProductFoundation>>),
     )
@@ -46,8 +49,16 @@ pub fn foundation_routes() -> Router<Arc<AppState>> {
 pub async fn get_all(
     State(state): State<Arc<AppState>>,
     ValidatedQuery(query): ValidatedQuery<PaginationQuery>,
+    LanguageCode(lang): LanguageCode,
 ) -> Result<Json<PaginationResponse<Vec<ProductFoundation>>>, AppError> {
-    let response = state.product_foundation_service.get_all(&query).await?;
+    let language_id = if let Some(code) = lang {
+        state.language_service.get_by_code(&code).await.ok().map(|l| l.id)
+    } else {
+        None
+    };
+
+    let response = state.product_foundation_service.get_all(&query, language_id).await?;
+    
     Ok(Json(response))
 }
 
@@ -82,13 +93,24 @@ pub async fn create(
         (status = 200, description = "Get foundation by ID", body = ApiResponse<ProductFoundation>),
         (status = 404, description = "Foundation not found", body = ErrorResponse)
     ),
-    params(("id" = Uuid, Path, description = "Foundation ID"))
+    params(
+        ("id" = Uuid, Path, description = "Foundation ID"),
+        ("Accept-Language" = Option<String>, Header, description = "Language code for filtering translations (e.g. 'en', 'id')"),
+    )
 )]
 pub async fn get_by_id(
     State(state): State<Arc<AppState>>,
+    LanguageCode(lang): LanguageCode,
     id: Path<Uuid>,
 ) -> Result<Json<ApiResponse<ProductFoundation>>, AppError> {
-    let foundation = state.product_foundation_service.get_by_id(*id).await?;
+    let language_id = if let Some(code) = lang {
+        state.language_service.get_by_code(&code).await.ok().map(|l| l.id)
+    } else {
+        None
+    };
+
+    let foundation = state.product_foundation_service.get_by_id(*id, language_id).await?;
+    
     Ok(Json(ApiResponse { data: foundation }))
 }
 
