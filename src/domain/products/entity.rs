@@ -9,8 +9,6 @@ use crate::domain::product_categories::entity::ProductCategory;
 use crate::domain::product_foundations::entity::ProductFoundation;
 use crate::domain::product_materials::entity::ProductMaterial;
 
-use crate::shared::traits::Translatable;
-
 #[derive(Clone, Serialize, Deserialize, ToSchema)]
 pub struct Product {
     pub id: Uuid,
@@ -26,22 +24,6 @@ pub struct Product {
     pub product_materials: Vec<ProductMaterial>,
     pub images: Vec<ProductImage>,
     pub translations: Vec<ProductTranslation>,
-}
-
-impl Translatable for Product {
-    fn filter_by_language(&mut self, language_id: Uuid) {
-        self.translations.retain(|t| t.language_id == language_id);
-
-        for category in &mut self.product_categories {
-            category.filter_by_language(language_id);
-        }
-        for foundation in &mut self.product_foundations {
-            foundation.filter_by_language(language_id);
-        }
-        for material in &mut self.product_materials {
-            material.filter_by_language(language_id);
-        }
-    }
 }
 
 #[derive(Clone, Serialize, Deserialize, ToSchema)]

@@ -67,7 +67,7 @@ impl ProductRepository for ProductRepositoryImpl {
         };
 
         let mut where_clauses = Vec::new();
-        let mut param_index = 3;
+        let mut param_index = 1;
 
         if search.is_some() {
             where_clauses.push(format!(
@@ -115,7 +115,7 @@ impl ProductRepository for ProductRepositoryImpl {
                 "EXISTS (SELECT 1 FROM product_foundation_relations WHERE product_id = p.id AND foundation_id = ${})",
                 param_index
             ));
-            // param_index += 1;
+            param_index += 1;
         }
 
         let where_clause = if where_clauses.is_empty() {
@@ -157,12 +157,12 @@ impl ProductRepository for ProductRepositoryImpl {
             FROM products p
             {}
             ORDER BY p.{} {}
-            LIMIT $1 OFFSET $2
+            LIMIT ${} OFFSET ${}
             "#,
-            where_clause, sort_field, sort_order
+            where_clause, sort_field, sort_order, param_index, param_index + 1
         );
 
-        let mut sql_query = sqlx::query(&sql).bind(limit).bind(offset);
+        let mut sql_query = sqlx::query(&sql);
 
         if let Some(s) = &search {
             sql_query = sql_query.bind(s);
@@ -176,6 +176,8 @@ impl ProductRepository for ProductRepositoryImpl {
         if let Some(fid) = query.foundation_id {
             sql_query = sql_query.bind(fid);
         }
+
+        sql_query = sql_query.bind(limit).bind(offset);
 
         let rows = sql_query.fetch_all(&self.pool)
             .await
@@ -1068,10 +1070,14 @@ mod tests {
 
     async fn seed_language(pool: &PgPool) -> Uuid {
         let id = Uuid::new_v4();
-        sqlx::query!(
-            "INSERT INTO languages (id, code, name, is_default) VALUES ($1, $2, $3, $4)",
-            id, "en", "English", true
+        let code = &id.to_string()[..10];
+        sqlx::query(
+            "INSERT INTO languages (id, code, name, is_default) VALUES ($1, $2, $3, $4)"
         )
+        .bind(id)
+        .bind(code)
+        .bind("English")
+        .bind(true)
         .execute(pool)
         .await
         .unwrap();
@@ -1093,6 +1099,7 @@ mod tests {
         let translation = ProductCategoryTranslation {
             category_id: id,
             language_id: lang_id,
+            language: None,
             name: "Category 1".to_string(),
         };
 
@@ -1127,6 +1134,7 @@ mod tests {
         let translation = ProductMaterialTranslation {
             material_id: id,
             language_id: lang_id,
+            language: None,
             name: "Material 1".to_string(),
         };
 
@@ -1161,6 +1169,7 @@ mod tests {
         let translation = ProductFoundationTranslation {
             foundation_id: id,
             language_id: lang_id,
+            language: None,
             name: "Foundation 1".to_string(),
         };
 
@@ -1198,6 +1207,7 @@ mod tests {
             translations: vec![ProductTranslation {
                 product_id: id,
                 language_id: lang_id,
+                language: None,
                 name: "Product 1".to_string(),
                 description: "Test product".to_string(),
             }],

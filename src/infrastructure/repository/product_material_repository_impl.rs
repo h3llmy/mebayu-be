@@ -233,13 +233,13 @@ mod tests {
     async fn setup_db(pool: &PgPool) {
         run_migrations(pool).await;
         // Insert a test language
-        sqlx::query!(
-            "INSERT INTO languages (id, code, name, is_default) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
-            LANGUAGE_ID,
-            "en",
-            "English",
-            true
+        sqlx::query(
+            "INSERT INTO languages (id, code, name, is_default) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING"
         )
+        .bind(LANGUAGE_ID)
+        .bind("maten")
+        .bind("English")
+        .bind(true)
         .execute(pool)
         .await
         .unwrap();
@@ -254,6 +254,7 @@ mod tests {
             translations: vec![ProductMaterialTranslation {
                 material_id: id,
                 language_id: LANGUAGE_ID,
+                language: None,
                 name: name.to_string(),
             }],
         }

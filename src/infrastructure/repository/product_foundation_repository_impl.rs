@@ -228,10 +228,13 @@ mod tests {
     async fn setup_db(pool: &PgPool) -> Uuid {
         run_migrations(pool).await;
         let id = Uuid::new_v4();
-        sqlx::query!(
-            "INSERT INTO languages (id, code, name, is_default) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
-            id, "en", "English", true
+        sqlx::query(
+            "INSERT INTO languages (id, code, name, is_default) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING"
         )
+        .bind(id)
+        .bind("founden")
+        .bind("English")
+        .bind(true)
         .execute(pool)
         .await
         .unwrap();
@@ -247,6 +250,7 @@ mod tests {
             translations: vec![ProductFoundationTranslation {
                 foundation_id: id,
                 language_id: lang_id,
+                language: None,
                 name: name.to_string(),
             }],
         }

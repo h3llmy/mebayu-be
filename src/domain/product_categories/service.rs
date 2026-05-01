@@ -192,12 +192,12 @@ mod tests {
         let category_clone = expected_category.clone();
         mock_repo
             .expect_find_by_id()
-            .with(mockall::predicate::eq(id))
+            .with(mockall::predicate::eq(id), mockall::predicate::always())
             .times(1)
-            .returning(move |_| Ok(category_clone.clone()));
+            .returning(move |_, _| Ok(category_clone.clone()));
 
         let service = ProductCategoryServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_lang_repo));
-        let result = service.get_by_id(id).await.unwrap();
+        let result = service.get_by_id(id, None).await.unwrap();
 
         assert_eq!(result.id, expected_category.id);
         assert_eq!(result.translations[0].name, "Test Category");
@@ -225,10 +225,10 @@ mod tests {
         mock_repo
             .expect_find_all()
             .times(1)
-            .returning(move |_| Ok((categories_clone.clone(), total_data)));
+            .returning(move |_, _| Ok((categories_clone.clone(), total_data)));
 
         let service = ProductCategoryServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_lang_repo));
-        let result = service.get_all(&query).await.unwrap();
+        let result = service.get_all(&query, None).await.unwrap();
 
         assert_eq!(result.total_data, total_data);
         assert_eq!(result.data.len(), 1);
@@ -263,6 +263,20 @@ mod tests {
             .times(1)
             .returning(|category| Ok(category.clone()));
 
+        mock_repo
+            .expect_find_by_id()
+            .returning(|_, _| Ok(ProductCategory {
+                id: Uuid::new_v4(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+                translations: vec![crate::domain::product_categories::entity::ProductCategoryTranslation {
+                    category_id: Uuid::new_v4(),
+                    language_id: Uuid::new_v4(),
+                    language: None,
+                    name: "New Category".to_string(),
+                }],
+            }));
+
         let service = ProductCategoryServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_lang_repo));
         let result = service.create(req).await.unwrap();
 
@@ -293,10 +307,23 @@ mod tests {
         };
 
         let existing_clone = existing.clone();
+        let toggle = std::sync::Arc::new(std::sync::Mutex::new(false));
         mock_repo
             .expect_find_by_id()
-            .with(mockall::predicate::eq(id))
-            .returning(move |_| Ok(existing_clone.clone()));
+            .with(mockall::predicate::eq(id), mockall::predicate::always())
+            .returning(move |_, _| {
+                let mut t = toggle.lock().unwrap();
+                if !*t {
+                    *t = true;
+                    Ok(existing_clone.clone())
+                } else {
+                    let mut updated = existing_clone.clone();
+                    if let Some(trans) = updated.translations.first_mut() {
+                        trans.name = "New Name".to_string();
+                    }
+                    Ok(updated)
+                }
+            });
 
         mock_lang_repo
             .expect_find_by_code()

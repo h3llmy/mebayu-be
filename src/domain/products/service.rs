@@ -210,12 +210,12 @@ mod tests {
         let product_clone = expected_product.clone();
         mock_repo
             .expect_find_by_id()
-            .with(mockall::predicate::eq(id))
+            .with(mockall::predicate::eq(id), mockall::predicate::always())
             .times(1)
-            .returning(move |_| Ok(product_clone.clone()));
+            .returning(move |_, _| Ok(product_clone.clone()));
 
         let service = ProductServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_s3));
-        let result = service.get_by_id(id).await.unwrap();
+        let result = service.get_by_id(id, None).await.unwrap();
 
         assert_eq!(result.id, expected_product.id);
         assert_eq!(result.translations[0].name, "Test Product");
@@ -253,10 +253,10 @@ mod tests {
         mock_repo
             .expect_find_all()
             .times(1)
-            .returning(move |_| Ok((products_clone.clone(), total_data)));
+            .returning(move |_, _| Ok((products_clone.clone(), total_data)));
 
         let service = ProductServiceImpl::new(Arc::new(mock_repo), Arc::new(mock_s3));
-        let result = service.get_all(&query).await.unwrap();
+        let result = service.get_all(&query, None).await.unwrap();
 
         assert_eq!(result.total_data, total_data);
         assert_eq!(result.data.len(), 1);
