@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT setting_id, language_id, hero_title, hero_description, about_title, about_description, about_image_url FROM setting_translations WHERE setting_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "setting_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "language_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "hero_title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "hero_description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "about_title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "about_description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "about_image_url",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "74b5294df10f8364d3ae3bf38076a9b285ca34dd9909807912a149bd7d214587"
+}

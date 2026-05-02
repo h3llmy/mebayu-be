@@ -87,6 +87,7 @@ impl SettingServiceImpl {
                     email: self.config.default_setting_email.clone(),
                     whatsapp_number: self.config.default_setting_whatsapp.clone(),
                     hero_images,
+                    translations: vec![],
                     created_at: Utc::now(),
                     updated_at: Utc::now(),
                 }
@@ -125,11 +126,28 @@ impl SettingServiceImpl {
                     s.hero_images.clone()
                 };
 
+                let translations = if let Some(trs) = &req.translations {
+                    trs.iter()
+                        .map(|t| crate::domain::settings::entity::SettingTranslation {
+                            setting_id: s.id,
+                            language_id: t.language_id,
+                            hero_title: t.hero_title.clone(),
+                            hero_description: t.hero_description.clone(),
+                            about_title: t.about_title.clone(),
+                            about_description: t.about_description.clone(),
+                            about_image_url: t.about_image_url.clone(),
+                        })
+                        .collect()
+                } else {
+                    s.translations.clone()
+                };
+
                 Setting {
                     id: s.id,
                     email: req.email.unwrap_or(s.email.clone()),
                     whatsapp_number: req.whatsapp_number.unwrap_or(s.whatsapp_number.clone()),
                     hero_images,
+                    translations,
                     created_at: s.created_at,
                     updated_at: Utc::now(),
                 }
@@ -152,6 +170,21 @@ impl SettingServiceImpl {
                     })
                     .collect();
 
+                let translations = req
+                    .translations
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|t| crate::domain::settings::entity::SettingTranslation {
+                        setting_id,
+                        language_id: t.language_id,
+                        hero_title: t.hero_title,
+                        hero_description: t.hero_description,
+                        about_title: t.about_title,
+                        about_description: t.about_description,
+                        about_image_url: t.about_image_url,
+                    })
+                    .collect();
+
                 Setting {
                     id: setting_id,
                     email: req
@@ -161,6 +194,7 @@ impl SettingServiceImpl {
                         .whatsapp_number
                         .unwrap_or_else(|| self.config.default_setting_whatsapp.clone()),
                     hero_images,
+                    translations,
                     created_at: Utc::now(),
                     updated_at: Utc::now(),
                 }

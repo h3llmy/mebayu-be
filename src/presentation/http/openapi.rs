@@ -71,7 +71,7 @@ use utoipa::{
             CreateProductCategoryRequest, UpdateProductCategoryRequest, ProductCategory,
             CreateProductMaterialRequest, UpdateProductMaterialRequest, ProductMaterial,
             ProductFoundation, CreateProductFoundationRequest, UpdateProductFoundationRequest,
-            CreateSettingRequest, UpdateSettingRequest, Setting,
+            CreateSettingRequest, UpdateSettingRequest, Setting, SettingTranslation, SettingTranslationRequest,
             CreateUserDto, UpdateUserDto, UserResponseDto, UserRole,
             PaginationQuery, SortOrder, ErrorResponse,
             ApiResponse<Product>, ApiResponse<UserResponseDto>, ApiResponse<ProductCategory>, ApiResponse<ProductMaterial>, ApiResponse<ProductFoundation>, ApiResponse<GetUploadUrlResponse>,

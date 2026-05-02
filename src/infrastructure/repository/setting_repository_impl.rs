@@ -41,6 +41,17 @@ impl SettingRepository for SettingRepositoryImpl {
             .await
             .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
             s.hero_images = images;
+
+            let translations = sqlx::query_as!(
+                crate::domain::settings::entity::SettingTranslation,
+                "SELECT setting_id, language_id, hero_title, hero_description, about_title, about_description, about_image_url FROM setting_translations WHERE setting_id = $1",
+                s.id
+            )
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+            s.translations = translations;
+
             Ok(Some(s))
         } else {
             Ok(None)
@@ -92,10 +103,30 @@ impl SettingRepository for SettingRepositoryImpl {
             created_images.push(res);
         }
 
+        for tr in &setting.translations {
+            sqlx::query!(
+                r#"
+                INSERT INTO setting_translations (setting_id, language_id, hero_title, hero_description, about_title, about_description, about_image_url)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                "#,
+                setting_res.id,
+                tr.language_id,
+                tr.hero_title,
+                tr.hero_description,
+                tr.about_title,
+                tr.about_description,
+                tr.about_image_url
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+        }
+
         tx.commit()
             .await
             .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
         setting_res.hero_images = created_images;
+        setting_res.translations = setting.translations.clone();
         Ok(setting_res)
     }
 
@@ -152,10 +183,35 @@ impl SettingRepository for SettingRepositoryImpl {
             created_images.push(res);
         }
 
+        sqlx::query!("DELETE FROM setting_translations WHERE setting_id = $1", id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+
+        for tr in &setting.translations {
+            sqlx::query!(
+                r#"
+                INSERT INTO setting_translations (setting_id, language_id, hero_title, hero_description, about_title, about_description, about_image_url)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                "#,
+                id,
+                tr.language_id,
+                tr.hero_title,
+                tr.hero_description,
+                tr.about_title,
+                tr.about_description,
+                tr.about_image_url
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
+        }
+
         tx.commit()
             .await
             .map_err(|e: sqlx::Error| AppError::Database(e.to_string()))?;
         setting_res.hero_images = created_images;
+        setting_res.translations = setting.translations.clone();
         Ok(setting_res)
     }
 
