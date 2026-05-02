@@ -80,8 +80,11 @@ pub async fn build_app(config: Config) -> Router {
         Arc::new(ProductMaterialServiceImpl::new(material_repo, lang_repo.clone()));
     let product_foundation_service =
         Arc::new(ProductFoundationServiceImpl::new(foundation_repo, lang_repo.clone()));
-    let setting_service =
-        Arc::new(SettingServiceImpl::new(setting_repo, redis_client.clone(), config.clone()));
+    let setting_service = {
+        use crate::domain::settings::service::RedisSettingCache;
+        let setting_cache = Arc::new(RedisSettingCache::new(redis_client.clone()));
+        Arc::new(SettingServiceImpl::new(setting_repo, setting_cache, config.clone()))
+    };
     let language_service = Arc::new(LanguageService::new(lang_repo.clone()));
     let user_service = Arc::new(UserServiceImpl::new(user_repo.clone(), config.clone()));
     let auth_service = Arc::new(AuthService::new(

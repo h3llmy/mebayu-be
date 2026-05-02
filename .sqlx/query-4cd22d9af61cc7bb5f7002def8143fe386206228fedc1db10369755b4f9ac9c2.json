@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM craftsmanship_images WHERE setting_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4cd22d9af61cc7bb5f7002def8143fe386206228fedc1db10369755b4f9ac9c2"
+}

@@ -15,10 +15,22 @@ pub struct Setting {
     pub updated_at: DateTime<Utc>,
     #[sqlx(skip)]
     pub translations: Vec<SettingTranslation>,
+    #[sqlx(skip)]
+    pub craftsmanship_images: Vec<CraftsmanshipImage>,
 }
 
 #[derive(Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct HeroImage {
+    pub id: Uuid,
+    pub setting_id: Uuid,
+    pub image_url: String,
+    pub order_index: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Serialize, Deserialize, FromRow, ToSchema)]
+pub struct CraftsmanshipImage {
     pub id: Uuid,
     pub setting_id: Uuid,
     pub image_url: String,

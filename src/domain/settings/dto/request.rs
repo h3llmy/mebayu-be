@@ -14,6 +14,8 @@ pub struct UpdateSettingRequest {
     pub email: Option<String>,
     pub whatsapp_number: Option<String>,
     pub hero_images: Option<Vec<String>>,
+    #[validate(length(equal = 4, message = "craftsmanship_image_urls must contain exactly 4 images"))]
+    pub craftsmanship_image_urls: Option<Vec<String>>,
     pub translations: Option<Vec<SettingTranslationRequest>>,
 }
 
